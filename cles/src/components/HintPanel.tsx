@@ -1,0 +1,220 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Question } from "@/lib/questionTypes";
+import { PENALTY_HINT_PER_USE } from "@/lib/config";
+
+interface HintPanelProps {
+  question: Question;
+  hintsUsed: number;
+  onUseHint: (type: 'hint' | 'example') => void;
+  disabled?: boolean;
+}
+
+export default function HintPanel({ 
+  question, 
+  hintsUsed, 
+  onUseHint, 
+  disabled = false 
+}: HintPanelProps) {
+  const [showHint1, setShowHint1] = useState(false);
+  const [showHint2, setShowHint2] = useState(false);
+  const [showHint3, setShowHint3] = useState(false);
+  const [showExample, setShowExample] = useState(false);
+
+  // Reset hint UI state when question changes
+  useEffect(() => {
+    setShowHint1(false);
+    setShowHint2(false);
+    setShowHint3(false);
+    setShowExample(false);
+  }, [question.id]);
+
+  const maxHints = 3;
+  const canUseHint1 = hintsUsed < 1;
+  const canUseHint2 = hintsUsed < 2;
+  const canUseHint3 = hintsUsed < 3;
+
+  const handleHintToggle = (hintNumber: 1 | 2 | 3) => {
+    if (disabled) return;
+
+    const hintUsed = hintsUsed >= hintNumber;
+    
+    switch (hintNumber) {
+      case 1:
+        if (!hintUsed && !showHint1) {
+          onUseHint('hint');
+        }
+        setShowHint1(!showHint1);
+        break;
+      case 2:
+        if (!hintUsed && !showHint2) {
+          onUseHint('hint');
+        }
+        setShowHint2(!showHint2);
+        break;
+      case 3:
+        if (!hintUsed && !showHint3) {
+          onUseHint('hint');
+        }
+        setShowHint3(!showHint3);
+        break;
+    }
+  };
+
+  const handleExampleToggle = () => {
+    if (disabled) return;
+    
+    if (!showExample) {
+      onUseHint('example');
+    }
+    setShowExample(!showExample);
+  };
+
+  return (
+    <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+      <div className="flex items-center gap-2 mb-4">
+        <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
+          <span className="text-white text-xs">💡</span>
+        </div>
+        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Hints & Support</h3>
+      </div>
+
+      <div className="space-y-3">
+        {/* Hint 1 */}
+        <div className="space-y-2">
+          <button
+            onClick={() => handleHintToggle(1)}
+            disabled={disabled}
+            className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+              showHint1
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Hint 1 {!canUseHint1 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {showHint1 ? '▼' : '▶'}
+              </span>
+            </div>
+          </button>
+          
+          {showHint1 && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                {question.hint || "No hint available for this question."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Hint 2 */}
+        <div className="space-y-2">
+          <button
+            onClick={() => handleHintToggle(2)}
+            disabled={disabled}
+            className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+              showHint2
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Hint 2 {!canUseHint2 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {showHint2 ? '▼' : '▶'}
+              </span>
+            </div>
+          </button>
+          
+          {showHint2 && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                {question.hint || "No additional hint available for this question."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Hint 3 */}
+        <div className="space-y-2">
+          <button
+            onClick={() => handleHintToggle(3)}
+            disabled={disabled}
+            className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+              showHint3
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Hint 3 {!canUseHint3 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {showHint3 ? '▼' : '▶'}
+              </span>
+            </div>
+          </button>
+          
+          {showHint3 && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                {question.hint || "No additional hint available for this question."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Example */}
+        <div className="space-y-2">
+          <button
+            onClick={handleExampleToggle}
+            disabled={disabled}
+            className={`w-full text-left p-3 rounded-lg border transition-all duration-200 ${
+              showExample
+                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                : 'bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                Example <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {showExample ? '▼' : '▶'}
+              </span>
+            </div>
+          </button>
+          
+          {showExample && (
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-sm text-green-800 dark:text-green-200">
+                {question.example || "No example available for this question."}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Usage Summary */}
+      <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+        <div className="text-xs text-gray-600 dark:text-gray-400">
+          <div className="flex justify-between">
+            <span>Hints used:</span>
+            <span className="font-medium">{hintsUsed}/3</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Penalty:</span>
+            <span className="font-medium text-red-500">-{hintsUsed * PENALTY_HINT_PER_USE} pts</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

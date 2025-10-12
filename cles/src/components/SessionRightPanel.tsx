@@ -1,0 +1,242 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { liveStreamsManager, HRDataPoint, AttentionData } from "@/lib/liveStreams";
+import { COGNITIVE_LOAD_WEIGHTS } from "@/lib/config";
+
+interface CognitiveLoad {
+  overall: number;
+  intrinsic: number;
+  extraneous: number;
+  germane: number;
+}
+
+interface SessionRightPanelProps {
+  difficulty: number;
+  hintsUsed: number;
+  timeWarning: boolean;
+  offscreenRate?: number;
+}
+
+export default function SessionRightPanel({ 
+  difficulty, 
+  hintsUsed, 
+  timeWarning, 
+  offscreenRate = 0 
+}: SessionRightPanelProps) {
+  const [streamStatus, setStreamStatus] = useState(liveStreamsManager.getStatus());
+  const [hrData, setHrData] = useState<HRDataPoint[]>([]);
+  const [attentionData, setAttentionData] = useState<AttentionData[]>([]);
+  const [cognitiveLoad, setCognitiveLoad] = useState<CognitiveLoad>({
+    overall: 0.5,
+    intrinsic: 0.2,
+    extraneous: 0.2,
+    germane: 0.6
+  });
+  const [currentHR, setCurrentHR] = useState(75);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Initialize streams and update data
+  useEffect(() => {
+    const initializeStreams = async () => {
+      try {
+        await liveStreamsManager.initialize();
+        setStreamStatus(liveStreamsManager.getStatus());
+        
+        // Connect video element to webcam stream
+        if (videoRef.current) {
+          const stream = liveStreamsManager.getWebcamStream();
+          if (stream) {
+            videoRef.current.srcObject = stream;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to initialize streams:', error);
+      }
+    };
+
+    initializeStreams();
+
+    // Update data every second
+    const interval = setInterval(() => {
+      setStreamStatus(liveStreamsManager.getStatus());
+      setHrData(liveStreamsManager.getHRSparkline());
+      setAttentionData(liveStreamsManager.getAttentionData());
+      setCurrentHR(liveStreamsManager.getCurrentHR());
+      
+      // Update cognitive load
+      updateCognitiveLoad();
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [difficulty, hintsUsed, timeWarning, offscreenRate]);
+
+  // Update cognitive load based on current state
+  const updateCognitiveLoad = () => {
+    const attentionAvg = liveStreamsManager.getAverageAttention(10);
+    
+    // Mock cognitive load calculation as per spec
+    const intrinsic = difficulty / 5; // difficulty-based intrinsic load
+    const extraneous = 0.2 + 0.5 * offscreenRate + (timeWarning ? 0.2 : 0);
+    const germane = Math.max(0, Math.min(1, attentionAvg * (1 - hintsUsed / 3)));
+    const overall = COGNITIVE_LOAD_WEIGHTS.w1 * (1 - attentionAvg) + 
+                   COGNITIVE_LOAD_WEIGHTS.w2 * extraneous + 
+                   COGNITIVE_LOAD_WEIGHTS.w3 * intrinsic + 
+                   COGNITIVE_LOAD_WEIGHTS.w4 * (1 - germane);
+
+    setCognitiveLoad({
+      overall: Math.max(0, Math.min(1, overall)),
+      intrinsic: Math.max(0, Math.min(1, intrinsic)),
+      extraneous: Math.max(0, Math.min(1, extraneous)),
+      germane: Math.max(0, Math.min(1, germane))
+    });
+  };
+
+  // Render HR sparkline
+  const renderHRSparkline = () => {
+    if (hrData.length === 0) {
+      return (
+        <div className="h-20 flex items-center justify-center text-gray-400 text-sm">
+          No HR data
+        </div>
+      );
+    }
+
+    const maxHR = Math.max(...hrData.map(d => d.bpm));
+    const minHR = Math.min(...hrData.map(d => d.bpm));
+    const range = maxHR - minHR || 1;
+
+    return (
+      <div className="h-20 flex items-end gap-1">
+        {hrData.slice(-60).map((point, i) => (
+          <div
+            key={i}
+            className="bg-gradient-to-t from-purple-500 to-pink-500 rounded-sm flex-1 min-h-[2px]"
+            style={{ 
+              height: `${Math.max(2, ((point.bpm - minHR) / range) * 100)}%` 
+            }}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Render cognitive load bar
+  const renderLoadBar = (label: string, value: number, color: string) => (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-gray-600 dark:text-gray-400">{label}</span>
+        <span className="text-gray-800 dark:text-gray-200 font-medium">
+          {Math.round(value * 100)}%
+        </span>
+      </div>
+      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div
+          className={`h-2 rounded-full transition-all duration-300 ${color}`}
+          style={{ width: `${value * 100}%` }}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Webcam Preview */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
+            <span className="text-white text-xs">📹</span>
+          </div>
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Webcam</h3>
+        </div>
+        
+        <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 relative overflow-hidden">
+          {streamStatus.webcam.active ? (
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+              style={{ transform: 'scaleX(-1)' }} // Mirror the video
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="text-2xl mb-2">📷</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {streamStatus.webcam.error || 'Camera not available'}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Face detection indicator */}
+          <div className="absolute top-2 right-2">
+            <div className={`w-3 h-3 rounded-full ${
+              streamStatus.webcam.faceDetected 
+                ? 'bg-green-500' 
+                : 'bg-red-500'
+            }`} />
+          </div>
+        </div>
+        
+        <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+          Face: {streamStatus.webcam.faceDetected ? 'Detected' : 'Not detected'}
+        </div>
+      </div>
+
+      {/* HR Sparkline */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
+            <span className="text-white text-xs">❤️</span>
+          </div>
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Heart Rate</h3>
+        </div>
+        
+        <div className="mb-2">
+          <div className="text-2xl font-bold gradient-text">{currentHR}</div>
+          <div className="text-xs text-gray-600 dark:text-gray-400">bpm</div>
+        </div>
+        
+        <div className="h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-lg p-2">
+          {renderHRSparkline()}
+        </div>
+      </div>
+
+      {/* Cognitive Load Panel */}
+      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
+            <span className="text-white text-xs">🧠</span>
+          </div>
+          <h3 className="text-sm font-bold text-gray-900 dark:text-white">Cognitive Load</h3>
+        </div>
+        
+        <div className="space-y-3">
+          {renderLoadBar('Overall', cognitiveLoad.overall, 'bg-gradient-to-r from-red-500 to-orange-500')}
+          {renderLoadBar('Intrinsic', cognitiveLoad.intrinsic, 'bg-gradient-to-r from-blue-500 to-cyan-500')}
+          {renderLoadBar('Extraneous', cognitiveLoad.extraneous, 'bg-gradient-to-r from-yellow-500 to-orange-500')}
+          {renderLoadBar('Germane', cognitiveLoad.germane, 'bg-gradient-to-r from-green-500 to-emerald-500')}
+        </div>
+      </div>
+
+      {/* Stream Health */}
+      {!streamStatus.webcam.active || !streamStatus.hr.active ? (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-600 dark:text-yellow-400 text-sm">⚠️</span>
+            <div className="text-xs text-yellow-800 dark:text-yellow-200">
+              {!streamStatus.webcam.active && 'Webcam not available'}
+              {!streamStatus.webcam.active && !streamStatus.hr.active && ' • '}
+              {!streamStatus.hr.active && 'HR monitoring not available'}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
