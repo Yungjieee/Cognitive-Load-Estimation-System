@@ -94,7 +94,7 @@ export default function HintPanel({
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Hint 1 {!canUseHint1 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+                Hint 1 (-0.1)
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {showHint1 ? '▼' : '▶'}
@@ -124,7 +124,7 @@ export default function HintPanel({
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Hint 2 {!canUseHint2 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+                Hint 2 (-0.1)
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {showHint2 ? '▼' : '▶'}
@@ -154,7 +154,7 @@ export default function HintPanel({
           >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                Hint 3 {!canUseHint3 && <span className="text-red-500">(-{PENALTY_HINT_PER_USE}pt)</span>}
+                Hint 3 (-0.1)
               </span>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {showHint3 ? '▼' : '▶'}
@@ -211,7 +211,7 @@ export default function HintPanel({
           </div>
           <div className="flex justify-between">
             <span>Penalty:</span>
-            <span className="font-medium text-red-500">-{hintsUsed * PENALTY_HINT_PER_USE} pts</span>
+            <span className="font-medium text-red-500">-{Number((hintsUsed * PENALTY_HINT_PER_USE).toFixed(1))} pts</span>
           </div>
         </div>
       </div>

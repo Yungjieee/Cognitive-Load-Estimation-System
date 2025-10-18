@@ -3,14 +3,11 @@
 export interface User {
   id: string;
   email: string;
-  profileCompleted: boolean;
-  profile: {
-    priorKnowledge: Record<string, number>;
-    experience: string;
-    interests: string[];
-    program: string;
-    year: string;
-  };
+  profile_completed: boolean;
+  profile_prior_knowledge: Record<string, string>; // subtopic_key: level_enum
+  profile_experience_taken_course: string; // 'yes' | 'no' | 'not_sure'
+  profile_experience_hands_on: string; // 'none' | 'some_exercises' | 'small_project' | 'large_project'
+  profile_interest_subtopics: string[]; // array of subtopic keys
   settings: {
     mode: 'support' | 'no_support';
   };
@@ -34,6 +31,8 @@ export interface Session {
     correct: boolean;
     timeSpent: number;
   }>;
+  hintsUsed: number[];
+  extraTimeUsed: boolean[];
   events: Array<{
     time: string;
     type: string;
@@ -65,14 +64,11 @@ export function createUser(email: string): User {
   const user: User = {
     id: `user_${Date.now()}`,
     email,
-    profileCompleted: false,
-    profile: {
-      priorKnowledge: {},
-      experience: '',
-      interests: [],
-      program: '',
-      year: '',
-    },
+    profile_completed: false,
+    profile_prior_knowledge: {},
+    profile_experience_taken_course: '',
+    profile_experience_hands_on: '',
+    profile_interest_subtopics: [],
     settings: {
       mode: 'support',
     },
@@ -82,12 +78,28 @@ export function createUser(email: string): User {
   return user;
 }
 
-export function updateUserProfile(userId: string, profile: Partial<User['profile']>): void {
+export function updateUserProfile(userId: string, profileData: {
+  profile_prior_knowledge?: Record<string, string>;
+  profile_experience_taken_course?: string;
+  profile_experience_hands_on?: string;
+  profile_interest_subtopics?: string[];
+}): void {
   if (typeof window === 'undefined') return;
   const user = getCurrentUser();
   if (user && user.id === userId) {
-    user.profile = { ...user.profile, ...profile };
-    user.profileCompleted = true;
+    if (profileData.profile_prior_knowledge) {
+      user.profile_prior_knowledge = profileData.profile_prior_knowledge;
+    }
+    if (profileData.profile_experience_taken_course) {
+      user.profile_experience_taken_course = profileData.profile_experience_taken_course;
+    }
+    if (profileData.profile_experience_hands_on) {
+      user.profile_experience_hands_on = profileData.profile_experience_hands_on;
+    }
+    if (profileData.profile_interest_subtopics) {
+      user.profile_interest_subtopics = profileData.profile_interest_subtopics;
+    }
+    user.profile_completed = true;
     setCurrentUser(user);
   }
 }
@@ -114,6 +126,8 @@ export function createSession(userId: string, subtopicId: string, mode: 'support
       avgLoad: 0,
       questions: [],
       events: [],
+      hintsUsed: [],
+      extraTimeUsed: [],
     };
   }
   
@@ -127,6 +141,8 @@ export function createSession(userId: string, subtopicId: string, mode: 'support
     avgLoad: 0,
     questions: [],
     events: [],
+    hintsUsed: [],
+    extraTimeUsed: [],
   };
   
   const sessions = getSessions();
@@ -216,7 +232,9 @@ export function completeSession(
     time: string;
     type: string;
     description: string;
-  }>
+  }>,
+  hintsUsed: number[],
+  extraTimeUsed: boolean[]
 ): void {
   const sessions = getSessions();
   const sessionIndex = sessions.findIndex(s => s.id === sessionId);
@@ -228,7 +246,9 @@ export function completeSession(
       score: totalScore,
       avgLoad: questionData.reduce((sum, q) => sum + q.load, 0) / questionData.length,
       questions: questionData,
-      events
+      events,
+      hintsUsed,
+      extraTimeUsed
     };
     
     localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));

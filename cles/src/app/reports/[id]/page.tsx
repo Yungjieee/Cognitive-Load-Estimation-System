@@ -8,41 +8,41 @@ function generateTimelineSentences(report: any): string[] {
   const sentences: string[] = [];
   
   // Session start
-  const startTime = new Date(report.date).toLocaleTimeString();
+  const startTime = new Date(report.startedAt).toLocaleTimeString();
   sentences.push(`User started session at ${startTime}.`);
   
-  // Analyze events to count per-question activities
-  const questionStats = Array.from({ length: 10 }, () => ({
-    hintsOpened: 0,
-    extraTimeRequests: 0,
-    timeWarnings: 0
+  // Use both session data and event data for comprehensive analysis
+  const questionStats = Array.from({ length: 5 }, (_, index) => ({
+    hintsOpened: report.hintsUsed?.[index] || 0,
+    extraTimeRequests: report.extraTimeUsed?.[index] ? 1 : 0,
+    timeWarnings: 0,
+    wasSkipped: false
   }));
   
-  // Count events per question
+  // Analyze events for additional insights
   report.events.forEach((event: any) => {
-    const eventType = event.type.toLowerCase();
-    const description = event.description.toLowerCase();
-    
-    // Extract question number from description if present
-    const questionMatch = description.match(/question (\d+)/);
-    if (questionMatch) {
-      const questionNum = parseInt(questionMatch[1]) - 1; // Convert to 0-based index
-      if (questionNum >= 0 && questionNum < 10) {
-        if (eventType.includes('hint') || description.includes('hint')) {
-          questionStats[questionNum].hintsOpened++;
-        }
-        if (eventType.includes('extra_time') || description.includes('extra time')) {
-          questionStats[questionNum].extraTimeRequests++;
-        }
-        if (eventType.includes('warning') || description.includes('warning')) {
-          questionStats[questionNum].timeWarnings++;
-        }
+    if (event.type === 'ten_second_warning' && event.questionIndex !== undefined) {
+      if (event.questionIndex >= 0 && event.questionIndex < 5) {
+        questionStats[event.questionIndex].timeWarnings++;
+      }
+    }
+    if (event.type === 'choose_skip' && event.questionIndex !== undefined) {
+      if (event.questionIndex >= 0 && event.questionIndex < 5) {
+        questionStats[event.questionIndex].wasSkipped = true;
       }
     }
   });
   
+  // Fallback: detect skipped questions based on question data
+  report.questions.slice(0, 5).forEach((question: any, index: number) => {
+    // If question was not answered correctly and has very low time spent, it might be skipped
+    if (!question.correct && question.timeSpent < 5) {
+      questionStats[index].wasSkipped = true;
+    }
+  });
+  
   // Per question analysis
-  report.questions.slice(0, 10).forEach((question: any, index: number) => {
+  report.questions.slice(0, 5).forEach((question: any, index: number) => {
     const questionNum = index + 1;
     const stats = questionStats[index];
     
@@ -52,14 +52,38 @@ function generateTimelineSentences(report: any): string[] {
     else if (question.load > 0.4) loadLevel = "medium";
     
     // Build sentence
-    let sentence = `In Q${questionNum}, the user opened ${stats.hintsOpened} hint${stats.hintsOpened !== 1 ? 's' : ''}`;
+    let sentence = `In Q${questionNum}, the user`;
     
-    if (stats.extraTimeRequests > 0) {
-      sentence += `, requested extra time ${stats.extraTimeRequests} time${stats.extraTimeRequests !== 1 ? 's' : ''}`;
+    // Show hints opened (even if question was skipped)
+    if (stats.hintsOpened > 0) {
+      sentence += ` opened ${stats.hintsOpened} hint${stats.hintsOpened !== 1 ? 's' : ''}`;
     }
     
+    // Show extra time requests (even if question was skipped)
+    if (stats.extraTimeRequests > 0) {
+      if (stats.hintsOpened > 0) {
+        sentence += `, requested extra time ${stats.extraTimeRequests} time${stats.extraTimeRequests !== 1 ? 's' : ''}`;
+      } else {
+        sentence += ` requested extra time ${stats.extraTimeRequests} time${stats.extraTimeRequests !== 1 ? 's' : ''}`;
+      }
+    }
+    
+    // Show time warnings (even if question was skipped)
     if (stats.timeWarnings > 0) {
-      sentence += `, had ${stats.timeWarnings} time warning${stats.timeWarnings !== 1 ? 's' : ''}`;
+      if (stats.hintsOpened > 0 || stats.extraTimeRequests > 0) {
+        sentence += `, had ${stats.timeWarnings} time warning${stats.timeWarnings !== 1 ? 's' : ''}`;
+      } else {
+        sentence += ` had ${stats.timeWarnings} time warning${stats.timeWarnings !== 1 ? 's' : ''}`;
+      }
+    }
+    
+    // Show skip status
+    if (stats.wasSkipped) {
+      if (stats.hintsOpened > 0 || stats.extraTimeRequests > 0 || stats.timeWarnings > 0) {
+        sentence += `, and skipped the question`;
+      } else {
+        sentence += ` skipped the question`;
+      }
     }
     
     sentence += `, and the cognitive load was ${loadLevel}.`;
@@ -68,7 +92,7 @@ function generateTimelineSentences(report: any): string[] {
   });
   
   // Session end
-  const endTime = new Date(report.date).toLocaleTimeString();
+  const endTime = new Date(report.endedAt).toLocaleTimeString();
   sentences.push(`User finished session at ${endTime}.`);
   
   return sentences;
@@ -90,6 +114,8 @@ export default function ReportPage() {
       setReport({
         id: session.id,
         date: formatDate(session.startedAt),
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
         subtopic: getSubtopicName(session.subtopicId),
         mode: session.mode,
         score: session.score,
@@ -97,6 +123,8 @@ export default function ReportPage() {
         avgLoad: session.avgLoad,
         questions: session.questions,
         events: session.events,
+        hintsUsed: session.hintsUsed || [],
+        extraTimeUsed: session.extraTimeUsed || [],
       });
     }
   }, [reportId]);
@@ -161,7 +189,7 @@ export default function ReportPage() {
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
-              <div className="text-3xl font-bold gradient-text">{report.score}/100</div>
+              <div className="text-3xl font-bold gradient-text">Score {report.score}/10</div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Score</div>
             </div>
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
@@ -188,7 +216,7 @@ export default function ReportPage() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Overall Load per Question</h2>
           </div>
           <div className="h-64 flex items-end gap-3 p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl">
-            {report.questions.slice(0, 10).map((q: any, index: number) => (
+            {report.questions.slice(0, 5).map((q: any, index: number) => (
               <div key={index} className="flex-1 flex flex-col items-center">
                 <div
                   className={`w-full rounded-t-xl transition-all duration-300 ${
@@ -216,7 +244,7 @@ export default function ReportPage() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Load Breakdown per Question</h2>
           </div>
           <div className="space-y-4">
-            {report.questions.slice(0, 10).map((q: any, index: number) => (
+            {report.questions.slice(0, 5).map((q: any, index: number) => (
               <div key={index} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <div className="w-12 text-sm font-semibold text-gray-900 dark:text-white">Q{index + 1}</div>
                 <div className="flex-1 flex gap-1 h-8 rounded-lg overflow-hidden">
@@ -285,7 +313,7 @@ export default function ReportPage() {
           </div>
           <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
             <p className="leading-relaxed">
-              Your cognitive load was moderate overall (42%). Questions 3 and 6 showed higher load levels,
+              Your cognitive load was moderate overall (42%). Questions 3 and 5 showed higher load levels,
               suggesting these topics may need more practice.
             </p>
             <p className="leading-relaxed">

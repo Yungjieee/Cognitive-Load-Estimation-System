@@ -73,7 +73,9 @@ export default function SessionPage() {
           time: new Date(event.timestamp).toLocaleTimeString(),
           type: event.type,
           description: `${event.type} at ${new Date(event.timestamp).toLocaleTimeString()}`
-        }))
+        })),
+        sessionState.hintsUsed,
+        sessionState.extraTimeUsed
       );
       
       router.push(`/reports/${sessionState.sessionId}`);
@@ -238,7 +240,7 @@ export default function SessionPage() {
               <div>
                 <h1 className="text-xl font-bold text-gray-900 dark:text-white">Data Structures Practice</h1>
                 <div className="text-sm text-gray-600 dark:text-gray-300">
-                  Question {sessionState.currentQuestionIndex + 1} of {sessionState.questions.length} • {currentConfig.level} • {currentConfig.points} pts
+                  Question {sessionState.currentQuestionIndex + 1} of 5 • {currentConfig?.level || 'Loading'} • {currentConfig?.points ? Number(currentConfig.points.toFixed(1)) : '0'} pts
                 </div>
               </div>
             </div>
@@ -257,7 +259,7 @@ export default function SessionPage() {
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-300">Time remaining</div>
               <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                Score: {sessionState.totalScore - sessionState.totalPenalties}
+                Score: {Number((sessionState.totalScore - sessionState.totalPenalties).toFixed(1))}
               </div>
             </div>
           </div>
@@ -302,8 +304,8 @@ export default function SessionPage() {
           <StressorBanner
             isVisible={sessionState.showStressor}
             onDismiss={handleDismissStressor}
-            timeLimit={currentConfig.limit}
-            timeElapsed={currentConfig.limit - sessionState.timeRemaining}
+            timeLimit={currentConfig?.limit || 0}
+            timeElapsed={(currentConfig?.limit || 0) - sessionState.timeRemaining}
           />
         )}
 
@@ -378,7 +380,7 @@ export default function SessionPage() {
           {/* Live Monitoring */}
           <div className="sticky top-6">
             <SessionRightPanel
-              difficulty={currentConfig.level === 'easy' ? 1 : currentConfig.level === 'medium' ? 2 : 3}
+              difficulty={currentConfig?.level === 'easy' ? 1 : currentConfig?.level === 'medium' ? 2 : 3}
               hintsUsed={sessionState.hintsUsed[sessionState.currentQuestionIndex]}
               timeWarning={showTenSecondWarning}
             />
@@ -394,7 +396,7 @@ export default function SessionPage() {
           onRequestExtraTime={handleRequestExtraTime}
           onSkipQuestion={handleSkipQuestion}
           extraTimeUsed={sessionState.extraTimeUsed[sessionState.currentQuestionIndex]}
-          originalTimeLimit={currentConfig.limit}
+          originalTimeLimit={currentConfig?.limit || 0}
         />
       )}
 

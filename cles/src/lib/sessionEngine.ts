@@ -59,7 +59,7 @@ class SessionEngine {
     mode: 'support' | 'no_support',
     onStateUpdate: (state: SessionState) => void
   ): SessionState {
-    // Get 10 questions for the session (mock implementation)
+    // Get 5 questions for the session (mock implementation)
     const questions = this.selectQuestions(subtopicId);
 
     this.state = {
@@ -80,9 +80,9 @@ class SessionEngine {
       showSkipConfirmation: false,
       showExtraTimeFeedback: false,
       extraTimeAdded: 0,
-      hintsUsed: new Array(10).fill(0),
-      extraTimeUsed: new Array(10).fill(false),
-      scores: new Array(10).fill(0),
+      hintsUsed: new Array(5).fill(0),
+      extraTimeUsed: new Array(5).fill(false),
+      scores: new Array(5).fill(0),
       totalScore: 0,
       totalPenalties: 0,
       events: [],
@@ -133,6 +133,12 @@ class SessionEngine {
 
     const questionIndex = this.state.currentQuestionIndex;
     const config = SCHEDULE[questionIndex];
+    
+    // Safety check for config
+    if (!config) {
+      console.error(`No config found for question index ${questionIndex}`);
+      return;
+    }
     
     // Clear any existing stressor timeout
     if (this.stressorTimeout) {
@@ -452,6 +458,13 @@ class SessionEngine {
       this.endSession();
       return;
     }
+    
+    // Additional safety check for config availability
+    const nextQuestionIndex = questionIndex + 1;
+    if (nextQuestionIndex >= SCHEDULE.length) {
+      this.endSession();
+      return;
+    }
 
     // Move to next question
     this.state.currentQuestionIndex++;
@@ -472,8 +485,8 @@ class SessionEngine {
     });
 
     // Calculate final score
-    const finalScore = Math.max(0, this.state.totalScore - this.state.totalPenalties);
-    const percentage = (finalScore / 100) * 100;
+    const finalScore = Math.max(0, Number((this.state.totalScore - this.state.totalPenalties).toFixed(1)));
+    const percentage = (finalScore / 10) * 100;
 
     const result: SessionResult = {
       sessionId: this.state.sessionId,
@@ -494,9 +507,9 @@ class SessionEngine {
 
   // Select questions for session (mock implementation)
   private selectQuestions(subtopicId: string): Question[] {
-    // For now, return the first 10 mock questions
+    // For now, return the first 5 mock questions
     // In a real implementation, this would query the database
-    return MOCK_QUESTIONS.slice(0, 10);
+    return MOCK_QUESTIONS.slice(0, 5);
   }
 
   // Log event

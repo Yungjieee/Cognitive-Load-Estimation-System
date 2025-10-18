@@ -63,9 +63,8 @@ export default function RevealCard({
 
   // Get explanation text
   const getExplanation = () => {
-    if (question.explanation) {
-      return question.explanation;
-    }
+    // Note: explanation property doesn't exist on question types
+    // Generate explanation based on question type
     
     // Generate basic explanation based on question type
     switch (question.qtype) {

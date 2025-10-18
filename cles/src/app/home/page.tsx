@@ -27,6 +27,18 @@ const SUBTOPICS: Subtopic[] = [
   { id: "sorting", name: "Sorting", description: "Common sorting algorithms" },
 ];
 
+// Subtopic freeze configuration
+const ENABLED_SUBTOPICS = ["array", "linked-list", "stack"];
+const LOCKED_SUBTOPICS = ["queue", "tree", "sorting"];
+
+function isSubtopicEnabled(subtopicId: string): boolean {
+  return ENABLED_SUBTOPICS.includes(subtopicId);
+}
+
+function isSubtopicLocked(subtopicId: string): boolean {
+  return LOCKED_SUBTOPICS.includes(subtopicId);
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<any>(null);
   const [recentReports, setRecentReports] = useState<any[]>([]);
@@ -55,7 +67,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const profileCompleted = isClient ? (user?.profileCompleted || false) : false;
+  const profileCompleted = isClient ? (user?.profile_completed || false) : false;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -96,42 +108,66 @@ export default function HomePage() {
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Data Structures Topics</h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {SUBTOPICS.map((s, index) => (
-              <div key={s.id} className="group card-hover bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <span className="text-white font-bold text-lg">{index + 1}</span>
+            {SUBTOPICS.map((s, index) => {
+              const isLocked = isSubtopicLocked(s.id);
+              const isEnabled = isSubtopicEnabled(s.id);
+              const canStart = isClient && profileCompleted && isEnabled;
+              
+              return (
+                <div key={s.id} className={`group card-hover bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg ${isLocked ? 'opacity-75' : ''}`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                      <span className="text-white font-bold text-lg">{index + 1}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <div className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
+                        5 Questions
+                      </div>
+                      {isLocked && (
+                        <div className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium">
+                          Locked
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
-                    10 Questions
+                  <div className="mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{s.name}</h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{s.description}</p>
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-4">
+                      <span>⏱️ ~8–10 min</span>
+                      <span>📊 Real-time monitoring</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <a href={`/subtopics/${s.id}`} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors">
+                      View Details
+                    </a>
+                    <button
+                      aria-disabled={!canStart}
+                      className={`text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 ${
+                        canStart
+                          ? "btn-primary text-white shadow-lg hover:shadow-xl" 
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                      }`}
+                      title={
+                        !isClient || !profileCompleted 
+                          ? "Complete profile first" 
+                          : isLocked 
+                            ? "This topic is locked for now."
+                            : "Start learning"
+                      }
+                    >
+                      {!isClient || !profileCompleted 
+                        ? "Complete Profile First" 
+                        : isLocked 
+                          ? "Locked" 
+                          : "Start Learning"
+                      }
+                    </button>
                   </div>
                 </div>
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{s.name}</h3>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{s.description}</p>
-                  <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-4">
-                    <span>⏱️ ~12–15 min</span>
-                    <span>📊 Real-time monitoring</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <a href={`/subtopics/${s.id}`} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors">
-                    View Details
-                  </a>
-                  <button
-                    aria-disabled={!isClient || !profileCompleted}
-                    className={`text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 ${
-                      isClient && profileCompleted 
-                        ? "btn-primary text-white shadow-lg hover:shadow-xl" 
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                    }`}
-                    title={!isClient || !profileCompleted ? "Complete profile first" : "Start learning"}
-                  >
-                    {isClient && profileCompleted ? "Start Learning" : "Complete Profile First"}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

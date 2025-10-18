@@ -1,6 +1,6 @@
 "use client";
 
-import { PENALTY_EXTRA_TIME_TOTAL } from "@/lib/config";
+// import { PENALTY_EXTRA_TIME_TOTAL } from "@/lib/config";
 
 interface TimeUpModalProps {
   isOpen: boolean;
@@ -31,7 +31,7 @@ export default function TimeUpModal({
     onClose();
   };
 
-  const extraTimeAmount = Math.floor(originalTimeLimit * 0.3);
+  const extraTimeAmount = Math.floor(originalTimeLimit * 0.7);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -52,7 +52,7 @@ export default function TimeUpModal({
             disabled={extraTimeUsed}
             className="w-full rounded-xl px-6 py-3 bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {extraTimeUsed ? 'Extra Time Already Used' : `Request Extra Time (-${PENALTY_EXTRA_TIME_TOTAL} points)`}
+            {extraTimeUsed ? 'Extra Time Already Used' : `Request Extra Time (+70% time, -0.1 pt)`}
           </button>
           
           <button
@@ -66,7 +66,7 @@ export default function TimeUpModal({
         <div className="mt-4 text-xs text-gray-500 dark:text-gray-400 text-center">
           {extraTimeUsed 
             ? "Extra time already used for this question"
-            : `Extra time grants ${extraTimeAmount} seconds (30% of original limit)`
+            : `Extra time grants ${extraTimeAmount} seconds (70% of original limit)`
           }
         </div>
       </div>

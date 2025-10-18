@@ -2,21 +2,16 @@
 // Single source of truth for all penalties, timings, and scoring rules
 
 export const SCHEDULE = [
-  { idx: 1,  level: 'easy',   limit: 30, points: 5 },
-  { idx: 2,  level: 'easy',   limit: 30, points: 5 },
-  { idx: 3,  level: 'easy',   limit: 30, points: 5 },
-  { idx: 4,  level: 'easy',   limit: 30, points: 5 },
-  { idx: 5,  level: 'medium', limit: 50, points: 10 },
-  { idx: 6,  level: 'medium', limit: 50, points: 10 },
-  { idx: 7,  level: 'medium', limit: 50, points: 10 },
-  { idx: 8,  level: 'hard',   limit: 70, points: 15 },
-  { idx: 9,  level: 'hard',   limit: 70, points: 15 },
-  { idx: 10, level: 'hard',   limit: 70, points: 20 },
+  { idx: 1,  level: 'easy',   limit: 30, points: 1.0 },
+  { idx: 2,  level: 'medium', limit: 50, points: 2.0 },
+  { idx: 3,  level: 'medium', limit: 50, points: 2.0 },
+  { idx: 4,  level: 'hard',   limit: 60, points: 2.5 },
+  { idx: 5,  level: 'hard',   limit: 60, points: 2.5 },
 ] as const;
 
-export const PENALTY_HINT_PER_USE = 1;     // per hint (question-level)
-export const PENALTY_EXTRA_TIME_TOTAL = 2; // per question (total-level)
-export const EXTRA_TIME_FACTOR = 0.30;     // +30% of original limit
+export const PENALTY_HINT_PER_USE = 0.1;   // per hint (question-level)
+export const PENALTY_EXTRA_TIME_TOTAL = 0.1; // per question (total-level)
+export const EXTRA_TIME_FACTOR = 0.70;     // +70% of original limit
 export const REST_MIN_MS = 60_000;         // 60s (support only)
 export const REST_MAX_MS = 120_000;        // 120s (support only)
 export const TEN_SECOND_WARNING_AT = 10;   // seconds left

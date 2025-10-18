@@ -13,6 +13,18 @@ const SUBTOPICS = {
   sorting: { name: "Sorting", description: "Common sorting algorithms" },
 };
 
+// Subtopic freeze configuration
+const ENABLED_SUBTOPICS = ["array", "linked-list", "stack"];
+const LOCKED_SUBTOPICS = ["queue", "tree", "sorting"];
+
+function isSubtopicEnabled(subtopicId: string): boolean {
+  return ENABLED_SUBTOPICS.includes(subtopicId);
+}
+
+function isSubtopicLocked(subtopicId: string): boolean {
+  return LOCKED_SUBTOPICS.includes(subtopicId);
+}
+
 export default function SubtopicDetailsPage() {
   const router = useRouter();
   const params = useParams();
@@ -26,9 +38,16 @@ export default function SubtopicDetailsPage() {
     setIsClient(true);
     const currentUser = getCurrentUser();
     setUser(currentUser);
-  }, []);
+    
+    // Redirect locked subtopics to home with toast
+    if (isSubtopicLocked(subtopicId)) {
+      router.push('/home');
+      // Note: In a real app, you'd show a toast notification here
+      return;
+    }
+  }, [subtopicId, router]);
 
-  const profileCompleted = isClient ? (user?.profileCompleted || false) : false;
+  const profileCompleted = isClient ? (user?.profile_completed || false) : false;
   const mode = isClient ? (user?.settings.mode || "support") : "support";
 
   function handleStartPreparation() {
@@ -109,11 +128,11 @@ export default function SubtopicDetailsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Questions:</span>
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">10</span>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">5</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Estimated time:</span>
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">12–15 minutes</span>
+                <span className="text-sm font-semibold text-gray-900 dark:text-white">8–10 minutes</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Mode:</span>
