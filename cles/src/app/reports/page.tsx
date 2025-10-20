@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCurrentUser, getSessionsByUser, formatDate } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { DatabaseClient } from "@/lib/database";
 
 type ReportItem = {
   id: string;
@@ -12,14 +13,15 @@ type ReportItem = {
   avgLoad: number;
 };
 
-const SUBTOPICS = {
-  array: "Array",
-  "linked-list": "Linked List",
-  stack: "Stack",
-  queue: "Queue",
-  tree: "Tree",
-  sorting: "Sorting",
-};
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 export default function ReportsPage() {
   const [user, setUser] = useState<any>(null);
@@ -28,24 +30,33 @@ export default function ReportsPage() {
 
   useEffect(() => {
     setIsClient(true);
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
     
-    if (currentUser) {
-      const sessions = getSessionsByUser(currentUser.id);
-      const reportItems = sessions
-        .filter(session => session.endedAt)
-        .map(session => ({
-          id: session.id,
-          date: formatDate(session.startedAt),
-          subtopic: SUBTOPICS[session.subtopicId as keyof typeof SUBTOPICS] || 'Unknown',
-          mode: session.mode,
-          score: session.score,
-          avgLoad: session.avgLoad,
-        }))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setReports(reportItems);
+    async function loadReports() {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          const sessions = await DatabaseClient.getSessionsByUser(currentUser.id);
+          const reportItems = sessions
+            .filter(session => session.ended_at)
+            .map(session => ({
+              id: String(session.id),
+              date: formatDate(session.started_at),
+              subtopic: session.subtopics?.name || 'Unknown',
+              mode: session.mode as "support" | "no_support",
+              score: session.score_total || 0,
+              avgLoad: 0.5, // TODO: Calculate from responses
+            }))
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setReports(reportItems);
+        }
+      } catch (error) {
+        console.error('Failed to load reports:', error);
+      }
     }
+    
+    loadReports();
   }, []);
 
   if (!isClient) {

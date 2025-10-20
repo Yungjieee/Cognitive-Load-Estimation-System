@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { getCurrentUser } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { DatabaseClient } from "@/lib/database";
 
 const SUBTOPICS = {
   array: { name: "Array", description: "Indexing, traversal, and operations" },
-  "linked-list": { name: "Linked List", description: "Singly/Doubly lists and operations" },
+  linked_list: { name: "Linked List", description: "Singly/Doubly lists and operations" },
   stack: { name: "Stack", description: "LIFO operations and use-cases" },
   queue: { name: "Queue", description: "FIFO, circular, priority" },
   tree: { name: "Tree", description: "Traversal, BST, basic properties" },
@@ -14,7 +15,7 @@ const SUBTOPICS = {
 };
 
 // Subtopic freeze configuration
-const ENABLED_SUBTOPICS = ["array", "linked-list", "stack"];
+const ENABLED_SUBTOPICS = ["array", "linked_list", "stack"];
 const LOCKED_SUBTOPICS = ["queue", "tree", "sorting"];
 
 function isSubtopicEnabled(subtopicId: string): boolean {
@@ -33,11 +34,37 @@ export default function SubtopicDetailsPage() {
 
   const [user, setUser] = useState<any>(null);
   const [isClient, setIsClient] = useState(false);
+  const [profileCompleted, setProfileCompleted] = useState(false);
+  const [mode, setMode] = useState<'support' | 'no_support'>('support');
 
   useEffect(() => {
     setIsClient(true);
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
+    
+    // Load user data from Supabase Auth and database
+    const loadUser = async () => {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        
+        if (currentUser) {
+          // Load user profile and settings from database
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('profile_completed, settings_mode')
+            .eq('id', currentUser.id)
+            .single();
+            
+          if (userProfile) {
+            setProfileCompleted(userProfile.profile_completed || false);
+            setMode(userProfile.settings_mode || 'support');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      }
+    };
+    
+    loadUser();
     
     // Redirect locked subtopics to home with toast
     if (isSubtopicLocked(subtopicId)) {
@@ -46,9 +73,6 @@ export default function SubtopicDetailsPage() {
       return;
     }
   }, [subtopicId, router]);
-
-  const profileCompleted = isClient ? (user?.profile_completed || false) : false;
-  const mode = isClient ? (user?.settings.mode || "support") : "support";
 
   function handleStartPreparation() {
     if (!profileCompleted) {

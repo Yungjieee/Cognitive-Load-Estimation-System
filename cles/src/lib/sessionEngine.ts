@@ -2,8 +2,8 @@
 // Implements the complete flow according to the specification
 
 import { SCHEDULE, PENALTY_HINT_PER_USE, PENALTY_EXTRA_TIME_TOTAL, EXTRA_TIME_FACTOR, EVENT_TYPES } from './config';
-import { MOCK_QUESTIONS } from './mockQuestions';
 import { Question, Answer } from './questionTypes';
+import { MOCK_QUESTIONS } from './mockQuestions';
 import { timerController } from './TimerController';
 import { eventLogger } from './eventLogger';
 import { liveStreamsManager } from './liveStreams';
@@ -27,6 +27,7 @@ export interface SessionState {
   showExtraTimeFeedback: boolean;
   extraTimeAdded: number;
   hintsUsed: number[];
+  exampleUsed: boolean[];
   extraTimeUsed: boolean[];
   scores: number[];
   totalScore: number;
@@ -51,21 +52,24 @@ class SessionEngine {
   private stateUpdateCallback: ((state: SessionState) => void) | null = null;
   private stressorTimeout: NodeJS.Timeout | null = null;
 
-  // Initialize session
+  // Initialize session with questions provided by caller (preferred)
   initialize(
-    sessionId: string,
+    sessionId: number | string,
     userId: string,
-    subtopicId: string,
+    subtopicId: number | string,
     mode: 'support' | 'no_support',
-    onStateUpdate: (state: SessionState) => void
+    onStateUpdate: (state: SessionState) => void,
+    questionsOverride?: Question[]
   ): SessionState {
-    // Get 5 questions for the session (mock implementation)
-    const questions = this.selectQuestions(subtopicId);
+    // Use provided questions if available, otherwise fallback to mock
+    const questions = questionsOverride && questionsOverride.length > 0
+      ? questionsOverride
+      : this.selectQuestions(String(subtopicId));
 
     this.state = {
-      sessionId,
+      sessionId: String(sessionId),
       userId,
-      subtopicId,
+      subtopicId: String(subtopicId),
       mode,
       questions,
       currentQuestionIndex: 0,
@@ -81,6 +85,7 @@ class SessionEngine {
       showExtraTimeFeedback: false,
       extraTimeAdded: 0,
       hintsUsed: new Array(5).fill(0),
+      exampleUsed: new Array(5).fill(false),
       extraTimeUsed: new Array(5).fill(false),
       scores: new Array(5).fill(0),
       totalScore: 0,
@@ -255,7 +260,7 @@ class SessionEngine {
   }
 
   // Submit answer
-  submitAnswer(answer: Answer): void {
+  async submitAnswer(answer: Answer): Promise<void> {
     if (!this.state || this.state.showReveal) return;
 
     // Pause timer
@@ -268,10 +273,37 @@ class SessionEngine {
     
     // Calculate points awarded
     const hintPenalty = this.state.hintsUsed[questionIndex] * PENALTY_HINT_PER_USE;
-    const pointsAwarded = isCorrect ? Math.max(0, config.points - hintPenalty) : 0;
+    const examplePenalty = this.state.exampleUsed[questionIndex] ? PENALTY_HINT_PER_USE : 0;
+    const extraTimePenalty = this.state.extraTimeUsed[questionIndex] ? PENALTY_EXTRA_TIME_TOTAL : 0;
+    const totalPenalty = hintPenalty + examplePenalty + extraTimePenalty;
+    const pointsAwarded = isCorrect ? Math.max(0, config.points - totalPenalty) : 0;
     
     this.state.scores[questionIndex] = pointsAwarded;
     this.state.totalScore += pointsAwarded;
+
+    // Persist response to database
+    try {
+      const { DatabaseClient } = await import('./database');
+      await DatabaseClient.createResponse({
+        session_id: this.state.sessionId,
+        question_id: String(this.state.questions[questionIndex].id),
+        q_index: questionIndex + 1,
+        user_answer: answer,
+        correct: isCorrect,
+        time_ms: (config.limit - this.state.timeRemaining) * 1000,
+        hints_used: this.state.hintsUsed[questionIndex],
+        extra_time_used: this.state.extraTimeUsed[questionIndex],
+        metrics: {
+          hintPenalty,
+          examplePenalty,
+          extraTimePenalty,
+          totalPenalty,
+          pointsAwarded
+        }
+      });
+    } catch (error) {
+      console.error('Failed to persist response:', error);
+    }
 
     // Show reveal
     this.state.showReveal = true;
@@ -327,11 +359,19 @@ class SessionEngine {
 
     const questionIndex = this.state.currentQuestionIndex;
     
-    // Check if we can use more hints
-    if (this.state.hintsUsed[questionIndex] >= 3) return;
+    if (type === 'hint') {
+      // Check if we can use more hints
+      if (this.state.hintsUsed[questionIndex] >= 3) return;
+      // Increment hint count
+      this.state.hintsUsed[questionIndex]++;
+    } else {
+      // Example: does not count toward 3 hints, but only charge once
+      if (this.state.exampleUsed[questionIndex]) return;
+      this.state.exampleUsed[questionIndex] = true;
+    }
 
-    // Increment hint count
-    this.state.hintsUsed[questionIndex]++;
+    // Apply penalty for hint or example (already deducted from pointsAwarded, so don't double-count)
+    // this.state.totalPenalties += PENALTY_HINT_PER_USE;
 
     // Log hint usage
     this.logEvent(type === 'hint' ? EVENT_TYPES.HINT_OPEN : EVENT_TYPES.EXAMPLE_OPEN, {
@@ -407,20 +447,45 @@ class SessionEngine {
   }
 
   // Skip question (called after confirmation)
-  skipQuestion(): void {
+  async skipQuestion(): Promise<void> {
     if (!this.state) return;
 
     const questionIndex = this.state.currentQuestionIndex;
+    const config = SCHEDULE[questionIndex];
     
     // Award 0 points
     this.state.scores[questionIndex] = 0;
+
+    // Persist skipped response to database
+    try {
+      const { DatabaseClient } = await import('./database');
+      await DatabaseClient.createResponse({
+        session_id: this.state.sessionId,
+        question_id: String(this.state.questions[questionIndex].id),
+        q_index: questionIndex + 1,
+        user_answer: null, // Skipped question has no answer
+        correct: false, // Skipped questions are considered incorrect
+        time_ms: (config.limit - this.state.timeRemaining) * 1000,
+        hints_used: this.state.hintsUsed[questionIndex],
+        extra_time_used: this.state.extraTimeUsed[questionIndex],
+        metrics: {
+          skipped: true,
+          hintPenalty: this.state.hintsUsed[questionIndex] * PENALTY_HINT_PER_USE,
+          examplePenalty: this.state.exampleUsed[questionIndex] ? PENALTY_HINT_PER_USE : 0,
+          extraTimePenalty: this.state.extraTimeUsed[questionIndex] ? PENALTY_EXTRA_TIME_TOTAL : 0,
+          pointsAwarded: 0
+        }
+      });
+    } catch (error) {
+      console.error('Failed to persist skipped response:', error);
+    }
 
     // Close modals
     this.state.showTimeUpModal = false;
     this.state.showSkipConfirmation = false;
 
     // Log skip
-    this.logEvent(EVENT_TYPES.CHOOSE_SKIP, {
+    await this.logEvent(EVENT_TYPES.CHOOSE_SKIP, {
       questionIndex
     });
 
@@ -472,13 +537,13 @@ class SessionEngine {
   }
 
   // End session
-  endSession(): SessionResult {
+  async endSession(): Promise<SessionResult> {
     if (!this.state) {
       throw new Error('Session not initialized');
     }
 
     // Log session end
-    this.logEvent(EVENT_TYPES.SESSION_END, {
+    await this.logEvent(EVENT_TYPES.SESSION_END, {
       sessionId: this.state.sessionId,
       totalScore: this.state.totalScore,
       totalPenalties: this.state.totalPenalties
@@ -487,6 +552,14 @@ class SessionEngine {
     // Calculate final score
     const finalScore = Math.max(0, Number((this.state.totalScore - this.state.totalPenalties).toFixed(1)));
     const percentage = (finalScore / 10) * 100;
+
+    // Update session score in database
+    try {
+      const { DatabaseClient } = await import('./database');
+      await DatabaseClient.updateSessionScore(parseInt(this.state.sessionId), finalScore);
+    } catch (error) {
+      console.error('Failed to update session score:', error);
+    }
 
     const result: SessionResult = {
       sessionId: this.state.sessionId,
@@ -513,7 +586,7 @@ class SessionEngine {
   }
 
   // Log event
-  private logEvent(type: string, payload: any): void {
+  private async logEvent(type: string, payload: any): Promise<void> {
     if (!this.state) return;
 
     const event = {
@@ -526,6 +599,22 @@ class SessionEngine {
 
     this.state.events.push(event);
     eventLogger.logEvent(event.type, event.payload, event.questionIndex);
+
+    // Persist event to database
+    try {
+      const { DatabaseClient } = await import('./database');
+      await DatabaseClient.createEvent({
+        session_id: this.state.sessionId,
+        ts_ms: Date.now(),
+        etype: type,
+        payload: {
+          ...payload,
+          questionIndex: this.state.currentQuestionIndex
+        }
+      });
+    } catch (error) {
+      console.error('Failed to persist event:', error);
+    }
   }
 
   // Update state and notify callback

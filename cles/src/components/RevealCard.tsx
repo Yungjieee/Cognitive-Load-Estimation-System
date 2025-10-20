@@ -25,8 +25,9 @@ export default function RevealCard({
       ? ENCOURAGEMENT_MESSAGES.correct 
       : ENCOURAGEMENT_MESSAGES.incorrect;
     
-    // Use question ID to get a deterministic index
-    const hash = question.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    // Use question ID (string or number) to get a deterministic index
+    const idStr = String(question.id);
+    const hash = idStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const index = hash % messages.length;
     return messages[index];
   }, [question.id, isCorrect]);
@@ -61,28 +62,23 @@ export default function RevealCard({
     }
   };
 
-  // Get explanation text
+  // Get explanation text: show DB explanation if present; otherwise fall back by type
   const getExplanation = () => {
-    // Note: explanation property doesn't exist on question types
-    // Generate explanation based on question type
-    
-    // Generate basic explanation based on question type
+    if (question.explanation) {
+      return question.explanation;
+    }
     switch (question.qtype) {
       case 'mcq':
       case 'image_mcq':
-        return `The correct answer is ${question.answer_key.correct}. This choice best matches the question requirements.`;
-      
+        return `The correct answer is ${question.answer_key.correct}.`;
       case 'matching':
-        return 'Each item on the left should be matched with its corresponding item on the right based on their relationship.';
-      
+        return 'Review the correct mapping above.';
       case 'reorder':
-        return 'The correct order follows the logical sequence or process described in the question.';
-      
+        return 'Review the correct order above.';
       case 'short':
-        return 'Your answer should match the expected format or contain the key terms mentioned in the question.';
-      
+        return 'Your answer should match the expected pattern.';
       default:
-        return 'Review the question and consider the key concepts involved.';
+        return '';
     }
   };
 

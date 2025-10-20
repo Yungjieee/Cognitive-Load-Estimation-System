@@ -1,7 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getCurrentUser, getSessionsByUser, formatDate } from "@/lib/storage";
+import { DatabaseClient } from "@/lib/database";
+import { supabase } from "@/lib/supabase";
+import type { Subtopic as DBSubtopic, Session } from "@/lib/database";
+import type { User } from "@supabase/supabase-js";
+
+// Helper function to format dates
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
 
 type Subtopic = {
   id: string;
@@ -18,56 +32,101 @@ type ReportItem = {
   avgLoad: number;
 };
 
-const SUBTOPICS: Subtopic[] = [
-  { id: "array", name: "Array", description: "Indexing, traversal, and operations" },
-  { id: "linked-list", name: "Linked List", description: "Singly/Doubly lists and operations" },
-  { id: "stack", name: "Stack", description: "LIFO operations and use-cases" },
-  { id: "queue", name: "Queue", description: "FIFO, circular, priority" },
-  { id: "tree", name: "Tree", description: "Traversal, BST, basic properties" },
-  { id: "sorting", name: "Sorting", description: "Common sorting algorithms" },
-];
-
-// Subtopic freeze configuration
-const ENABLED_SUBTOPICS = ["array", "linked-list", "stack"];
-const LOCKED_SUBTOPICS = ["queue", "tree", "sorting"];
-
-function isSubtopicEnabled(subtopicId: string): boolean {
-  return ENABLED_SUBTOPICS.includes(subtopicId);
+// Helper functions for subtopic status
+function isSubtopicEnabled(subtopic: DBSubtopic): boolean {
+  return subtopic.enabled;
 }
 
-function isSubtopicLocked(subtopicId: string): boolean {
-  return LOCKED_SUBTOPICS.includes(subtopicId);
+function isSubtopicLocked(subtopic: DBSubtopic): boolean {
+  return !subtopic.enabled;
 }
 
 export default function HomePage() {
-  const [user, setUser] = useState<any>(null);
-  const [recentReports, setRecentReports] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [recentReports, setRecentReports] = useState<Session[]>([]);
+  const [subtopics, setSubtopics] = useState<DBSubtopic[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [profileCompleted, setProfileCompleted] = useState(false);
 
   useEffect(() => {
-    // Set client flag and load user data
+    // Set client flag
     setIsClient(true);
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
     
-    if (currentUser) {
-      const sessions = getSessionsByUser(currentUser.id);
-      const reports = sessions
-        .filter(session => session.endedAt)
-        .slice(-3)
-        .map(session => ({
-          id: session.id,
-          date: formatDate(session.startedAt),
-          subtopic: SUBTOPICS.find(s => s.id === session.subtopicId)?.name || 'Unknown',
-          mode: session.mode,
-          score: session.score,
-          avgLoad: session.avgLoad,
-        }));
-      setRecentReports(reports);
-    }
+    // Get current user from Supabase Auth and check profile completion
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      if (user) {
+        // Check profile completion from database
+        try {
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('profile_completed')
+            .eq('id', user.id)
+            .single();
+            
+          setProfileCompleted(userProfile?.profile_completed || false);
+        } catch (error) {
+          console.error('Failed to check profile completion:', error);
+          setProfileCompleted(false);
+        }
+      }
+      
+      return user;
+    };
+
+    // Load subtopics from database
+    const loadSubtopics = async () => {
+      try {
+        const dbSubtopics = await DatabaseClient.getSubtopics();
+        setSubtopics(dbSubtopics);
+      } catch (error) {
+        console.error('Failed to load subtopics:', error);
+        setSubtopics([]);
+      }
+    };
+
+    // Load recent reports from database
+    const loadRecentReports = async (userId: string) => {
+      try {
+        const sessions = await DatabaseClient.getSessionsByUser(userId);
+        // Get the 3 most recent sessions
+        const recentSessions = sessions
+          .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())
+          .slice(0, 3);
+        
+        setRecentReports(recentSessions);
+      } catch (error) {
+        console.error('Failed to load recent reports:', error);
+        setRecentReports([]);
+      }
+    };
+
+    // Load user, subtopics, and recent reports
+    const initializeData = async () => {
+      const currentUser = await getCurrentUser();
+      await loadSubtopics();
+      
+      if (currentUser) {
+        await loadRecentReports(currentUser.id);
+      }
+      
+      setLoading(false);
+    };
+
+    initializeData();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const profileCompleted = isClient ? (user?.profile_completed || false) : false;
+  // Profile completion is now managed by state
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -107,68 +166,125 @@ export default function HomePage() {
 
         <section className="mb-12">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Data Structures Topics</h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {SUBTOPICS.map((s, index) => {
-              const isLocked = isSubtopicLocked(s.id);
-              const isEnabled = isSubtopicEnabled(s.id);
-              const canStart = isClient && profileCompleted && isEnabled;
-              
-              return (
-                <div key={s.id} className={`group card-hover bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg ${isLocked ? 'opacity-75' : ''}`}>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      <span className="text-white font-bold text-lg">{index + 1}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
-                        5 Questions
-                      </div>
-                      {isLocked && (
-                        <div className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium">
-                          Locked
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{s.name}</h3>
-                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{s.description}</p>
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-4">
-                      <span>⏱️ ~8–10 min</span>
-                      <span>📊 Real-time monitoring</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <a href={`/subtopics/${s.id}`} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors">
-                      View Details
-                    </a>
-                    <button
-                      aria-disabled={!canStart}
-                      className={`text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 ${
-                        canStart
-                          ? "btn-primary text-white shadow-lg hover:shadow-xl" 
-                          : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                      }`}
-                      title={
-                        !isClient || !profileCompleted 
-                          ? "Complete profile first" 
-                          : isLocked 
-                            ? "This topic is locked for now."
-                            : "Start learning"
-                      }
-                    >
-                      {!isClient || !profileCompleted 
-                        ? "Complete Profile First" 
-                        : isLocked 
-                          ? "Locked" 
-                          : "Start Learning"
-                      }
-                    </button>
+          {loading ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[...Array(6)].map((_, index) => (
+                <div key={index} className="animate-pulse bg-white/80 dark:bg-gray-800/80 rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30">
+                  <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-xl mb-4"></div>
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="flex gap-3">
+                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                    <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* Enabled Subtopics Row */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Available Topics</h3>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {subtopics.filter(s => s.enabled).map((s, index) => {
+                    const canStart = isClient && profileCompleted;
+                    
+                    return (
+                      <div key={s.id} className="group card-hover bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg flex flex-col h-full">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                            <span className="text-white font-bold text-lg">{index + 1}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <div className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
+                              5 Questions
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-1 mb-4">
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{s.name}</h3>
+                          <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{s.description || 'Practice data structure concepts'}</p>
+                          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-4">
+                            <span>⏱️ ~8–10 min</span>
+                            <span>📊 Real-time monitoring</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 mt-auto">
+                          <a href={`/subtopics/${s.key}`} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors">
+                            View Details
+                          </a>
+                          <button
+                            aria-disabled={!canStart}
+                            className={`text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 ${
+                              canStart
+                                ? "btn-primary text-white shadow-lg hover:shadow-xl" 
+                                : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                            }`}
+                            title={
+                              !isClient || !profileCompleted 
+                                ? "Complete profile first" 
+                                : "Start learning"
+                            }
+                          >
+                            {!isClient || !profileCompleted 
+                              ? "Complete Profile First" 
+                              : "Start Learning"
+                            }
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Locked Subtopics Row */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Coming Soon</h3>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {subtopics.filter(s => !s.enabled).map((s, index) => {
+                    return (
+                      <div key={s.id} className="group card-hover bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg opacity-75 flex flex-col h-full">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="w-12 h-12 rounded-xl gradient-bg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                            <span className="text-white font-bold text-lg">{subtopics.filter(s => s.enabled).length + index + 1}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <div className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-medium">
+                              5 Questions
+                            </div>
+                            <div className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-medium">
+                              Locked
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex-1 mb-4">
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{s.name}</h3>
+                          <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{s.description || 'Practice data structure concepts'}</p>
+                          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-4">
+                            <span>⏱️ ~8–10 min</span>
+                            <span>📊 Real-time monitoring</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 mt-auto">
+                          <a href={`/subtopics/${s.key}`} className="text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-medium transition-colors">
+                            View Details
+                          </a>
+                          <button
+                            disabled
+                            className="text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                            title="This topic is locked for now."
+                          >
+                            Locked
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <section>
@@ -186,17 +302,17 @@ export default function HomePage() {
                   </div>
                   <div>
                     <div className="font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-                      {r.subtopic} Practice Session
+                      {r.subtopics?.name || 'Unknown'} Practice Session
                     </div>
                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {r.date} • {r.mode === "support" ? "Support Mode" : "No-Support Mode"}
+                      {formatDate(r.started_at)} • {r.mode === "support" ? "Support Mode" : "No-Support Mode"}
                     </div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="font-bold text-lg text-gray-900 dark:text-white">{r.score}/10</div>
+                  <div className="font-bold text-lg text-gray-900 dark:text-white">{r.score_total.toFixed(1)}/10</div>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    Avg Load: {Math.round(r.avgLoad * 100)}%
+                    Session Complete
                   </div>
                 </div>
               </a>

@@ -135,7 +135,7 @@ export default function HintPanel({
           {showHint2 && (
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                {question.hint || "No additional hint available for this question."}
+                {(question as any).hints?.[1] || question.hint || "No additional hint available for this question."}
               </p>
             </div>
           )}
@@ -165,7 +165,7 @@ export default function HintPanel({
           {showHint3 && (
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <p className="text-sm text-blue-800 dark:text-blue-200">
-                {question.hint || "No additional hint available for this question."}
+                {(question as any).hints?.[2] || question.hint || "No additional hint available for this question."}
               </p>
             </div>
           )}
@@ -210,8 +210,12 @@ export default function HintPanel({
             <span className="font-medium">{hintsUsed}/3</span>
           </div>
           <div className="flex justify-between">
+            <span>Example used:</span>
+            <span className="font-medium">{showExample ? 'Yes' : 'No'}</span>
+          </div>
+          <div className="flex justify-between">
             <span>Penalty:</span>
-            <span className="font-medium text-red-500">-{Number((hintsUsed * PENALTY_HINT_PER_USE).toFixed(1))} pts</span>
+            <span className="font-medium text-red-500">-{Number(((hintsUsed + (showExample ? 1 : 0)) * PENALTY_HINT_PER_USE).toFixed(1))} pts</span>
           </div>
         </div>
       </div>

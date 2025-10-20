@@ -2,35 +2,62 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, updateUserSettings } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { DatabaseClient } from "@/lib/database";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState(getCurrentUser());
+  const [user, setUser] = useState<any>(null);
   const [mode, setMode] = useState<"support" | "no_support">("support");
   const [loading, setLoading] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  // Load saved settings on mount
+  // Load user data and settings from database
   useEffect(() => {
-    if (user) {
-      setMode(user.settings.mode);
+    async function loadUser() {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          setUser(currentUser);
+          
+          // Load user settings from database
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('settings_mode')
+            .eq('id', currentUser.id)
+            .single();
+            
+          if (userProfile && userProfile.settings_mode) {
+            setMode(userProfile.settings_mode);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      }
     }
-  }, [user]);
+    
+    loadUser();
+  }, []);
 
   async function handleSave() {
     if (!user) return;
     
     setLoading(true);
     
-    // Save to localStorage
-    updateUserSettings(user.id, { mode });
-    
-    setTimeout(() => {
+    try {
+      // Save to database
+      await DatabaseClient.updateUserSettings(user.id, { settings_mode: mode });
+      
+      setTimeout(() => {
+        setLoading(false);
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      }, 300);
+    } catch (error) {
+      console.error('Failed to save settings:', error);
       setLoading(false);
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
-    }, 300);
+      alert('Failed to save settings. Please try again.');
+    }
   }
 
   return (

@@ -2,31 +2,41 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getCurrentUser, createUser } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    setError("");
     
-        // Simulate sign-in with localStorage
-        setTimeout(() => {
-          // Check if user exists, if not create one
-          let user = getCurrentUser();
-          if (!user) {
-            user = createUser(email);
-          }
-          
-          setLoading(false);
-          // Dispatch custom event to update header
-          window.dispatchEvent(new CustomEvent('userUpdated'));
-          router.push("/home");
-        }, 500);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (data.user) {
+        // Dispatch custom event to update header
+        window.dispatchEvent(new CustomEvent('userUpdated'));
+        router.push("/home");
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred');
+      setLoading(false);
+    }
   }
 
   return (
@@ -42,6 +52,11 @@ export default function SignInPage() {
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+              </div>
+            )}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
               <input

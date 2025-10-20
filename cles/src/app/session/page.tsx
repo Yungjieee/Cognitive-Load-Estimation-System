@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getCurrentUser, createSession, completeSession } from "@/lib/storage";
 import { sessionEngine, SessionState } from "@/lib/sessionEngine";
+import { DatabaseClient } from "@/lib/database";
+import { supabase } from "@/lib/supabase";
 import { liveStreamsManager } from "@/lib/liveStreams";
 import { Answer } from "@/lib/questionTypes";
 import { SCHEDULE } from "@/lib/config";
@@ -18,14 +19,43 @@ import StressorBanner from "@/components/StressorBanner";
 export default function SessionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const subtopicId = searchParams.get("subtopic");
+  const subtopicKey = searchParams.get("subtopic");
 
-  const [user, setUser] = useState(getCurrentUser());
+  const [userId, setUserId] = useState<string | null>(null);
+  const [mode, setMode] = useState<'support' | 'no_support'>('support');
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [currentAnswer, setCurrentAnswer] = useState<Answer | null>(null);
   const [showTenSecondWarning, setShowTenSecondWarning] = useState(false);
 
-  const mode = user?.settings.mode || "support";
+  // Load current user and settings from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!isMounted) return;
+      setUserId(user?.id ?? null);
+      
+      if (user) {
+        // Load user settings from database
+        try {
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('settings_mode')
+            .eq('id', user.id)
+            .single();
+            
+          if (userProfile && userProfile.settings_mode) {
+            setMode(userProfile.settings_mode);
+          }
+        } catch (error) {
+          console.error('Failed to load user settings:', error);
+          // Fallback to 'support' mode
+          setMode('support');
+        }
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   // Handle timer updates
   useEffect(() => {
@@ -50,65 +80,141 @@ export default function SessionPage() {
   // Handle session completion
   useEffect(() => {
     if (sessionState?.isCompleted) {
-      const result = sessionEngine.endSession();
-      
-      // Stop all streams
-      liveStreamsManager.cleanup();
-      
-      // Save session data
-      completeSession(
-        sessionState.sessionId,
-        result.totalScore,
-        result.percentage / 100, // Convert to 0-1 scale
-        result.events.map((event, index) => ({
-          id: index + 1,
-          load: Math.random() * 0.6 + 0.2,
-          intrinsic: Math.random() * 0.4 + 0.1,
-          extraneous: Math.random() * 0.3 + 0.1,
-          germane: Math.random() * 0.4 + 0.1,
-          correct: event.payload.answer_submit?.isCorrect || false,
-          timeSpent: event.payload.answer_submit?.timeSpent || 0
-        })),
-        result.events.map(event => ({
-          time: new Date(event.timestamp).toLocaleTimeString(),
-          type: event.type,
-          description: `${event.type} at ${new Date(event.timestamp).toLocaleTimeString()}`
-        })),
-        sessionState.hintsUsed,
-        sessionState.extraTimeUsed
-      );
-      
-      router.push(`/reports/${sessionState.sessionId}`);
+      (async () => {
+        const result = await sessionEngine.endSession();
+        
+        // Stop all streams
+        liveStreamsManager.cleanup();
+        
+        router.push(`/reports/${sessionState.sessionId}`);
+      })();
     }
   }, [sessionState?.isCompleted, router]);
 
-  function startSession() {
-    if (!user || !subtopicId) return;
-    
-    const session = createSession(user.id, subtopicId, mode);
-    
-    // Initialize session engine
-    const initialState = sessionEngine.initialize(
-      session.id,
-      user.id,
-      subtopicId,
-      mode as 'support' | 'no_support',
-      (state) => {
-        setSessionState(state);
+  function mapDifficulty(letter: 'E' | 'M' | 'H'): number {
+    switch (letter) {
+      case 'E': return 1;
+      case 'M': return 3;
+      case 'H': return 5;
+      default: return 3;
+    }
+  }
+
+  function transformDbQuestions(rows: any[]): any[] {
+    const LETTERS = ['A','B','C','D','E','F'];
+    return rows.map((q) => {
+      const hintsArray: string[] = Array.isArray(q.hints)
+        ? q.hints
+        : (q.hints ? JSON.parse(q.hints) : []);
+      const hintText = hintsArray[0] || null;
+      // Prefer explicit DB 'example' column; fallback to legacy 'explanation' or second hint
+      const exampleText = q.example || q.explanation || hintsArray[1] || null;
+      if (q.qtype === 'mcq') {
+        const optionsArray: string[] = Array.isArray(q.options) ? q.options : (q.options ? JSON.parse(q.options) : []);
+        const answerArray: string[] = Array.isArray(q.answer_key) ? q.answer_key : (q.answer_key ? JSON.parse(q.answer_key) : []);
+        const options = optionsArray.map((text, idx) => ({ key: LETTERS[idx] || String(idx+1), text }));
+        const correctText = answerArray[0];
+        const correctIndex = optionsArray.findIndex(t => t === correctText);
+        const correctKey = correctIndex >= 0 ? (LETTERS[correctIndex] || String(correctIndex+1)) : (LETTERS[0] || 'A');
+        return {
+          id: Number(q.id),
+          subtopic_id: Number(q.subtopic_id),
+          difficulty: mapDifficulty(q.difficulty as 'E'|'M'|'H'),
+          qtype: 'mcq',
+          prompt: q.prompt,
+          options,
+          answer_key: { correct: correctKey },
+          hint: hintText,
+          example: exampleText,
+          explanation: q.explanation || null,
+          hints: hintsArray,
+          enabled: q.enabled,
+        };
       }
-    );
-    
-    setSessionState(initialState);
+      // Treat unknown types (e.g., 'code', 'short') as short-answer
+      return {
+        id: Number(q.id),
+        subtopic_id: Number(q.subtopic_id),
+        difficulty: mapDifficulty(q.difficulty as 'E'|'M'|'H'),
+        qtype: 'short',
+        prompt: q.prompt,
+        answer_key: { regex: '.*' },
+        hint: hintText,
+        example: exampleText,
+        explanation: q.explanation || null,
+        hints: hintsArray,
+        enabled: q.enabled,
+      };
+    });
+  }
+
+  async function startSession() {
+    try {
+      if (!subtopicKey) {
+        alert('No subtopic selected. Please start from a subtopic details page.');
+        return;
+      }
+      if (!userId) {
+        alert('You are not signed in. Please sign in again.');
+        return;
+      }
+
+      // Resolve subtopic ID by key
+      const subtopic = await DatabaseClient.getSubtopic(subtopicKey);
+      if (!subtopic) {
+        console.error('Invalid subtopic');
+        return;
+      }
+
+      // Ensure user profile row exists for FK (sessions.user_id -> users.id)
+      const { data: authData } = await supabase.auth.getUser();
+      const authEmail = authData.user?.email || '';
+      await DatabaseClient.ensureUserRecord(userId, authEmail);
+
+      // Create DB session
+      const dbSession = await DatabaseClient.createSession({
+        user_id: userId,
+        subtopic_id: subtopic.id,
+        mode,
+      });
+
+      // Fetch questions from DB: 1E/2M/2H (random within pools)
+      let questionsOverride: any[] | undefined = undefined;
+      try {
+        const dbQuestions = await DatabaseClient.getQuestionsForSession(String(subtopic.id));
+        if (dbQuestions && dbQuestions.length > 0) {
+          questionsOverride = transformDbQuestions(dbQuestions) as any[];
+        }
+      } catch (qErr) {
+        console.error('Question fetch failed; falling back to mock:', qErr);
+      }
+
+      // Initialize session engine
+      const initialState = sessionEngine.initialize(
+        Number(dbSession.id),
+        userId,
+        Number(subtopic.id),
+        mode,
+        (state) => setSessionState(state),
+        questionsOverride
+      );
+
+      setSessionState(initialState);
+    } catch (err: any) {
+      console.error('Failed to start session:', err);
+      const msg = err?.message || JSON.stringify(err);
+      alert(`Failed to start session: ${msg}`);
+    }
   }
 
   function handleAnswerChange(answer: Answer) {
     setCurrentAnswer(answer);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     if (!currentAnswer || !sessionState) return;
     
-    sessionEngine.submitAnswer(currentAnswer);
+    await sessionEngine.submitAnswer(currentAnswer);
     setCurrentAnswer(null);
   }
 
@@ -125,8 +231,8 @@ export default function SessionPage() {
     sessionEngine.requestSkipConfirmation();
   }
 
-  function handleConfirmSkip() {
-    sessionEngine.skipQuestion();
+  async function handleConfirmSkip() {
+    await sessionEngine.skipQuestion();
   }
 
   function handleCancelSkip() {
@@ -259,7 +365,7 @@ export default function SessionPage() {
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-300">Time remaining</div>
               <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                Score: {Number((sessionState.totalScore - sessionState.totalPenalties).toFixed(1))}
+                Score: {Number(sessionState.totalScore.toFixed(1))}
               </div>
             </div>
           </div>

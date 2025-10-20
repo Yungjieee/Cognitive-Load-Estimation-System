@@ -2,36 +2,33 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getCurrentUser } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isClient, setIsClient] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    const currentUser = getCurrentUser();
-    setUser(currentUser);
-
-    // Listen for storage changes to update user state
-    const handleStorageChange = () => {
-      const updatedUser = getCurrentUser();
-      setUser(updatedUser);
-    };
-
-    // Listen for custom storage events
-    window.addEventListener('storage', handleStorageChange);
     
-    // Also listen for custom events (for same-tab updates)
-    window.addEventListener('userUpdated', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('userUpdated', handleStorageChange);
+    // Get current user from Supabase Auth
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
     };
+
+    getCurrentUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Close profile menu when clicking outside
@@ -49,11 +46,9 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showProfileMenu]);
 
-  function handleLogout() {
-    localStorage.removeItem('cles-current-user');
+  async function handleLogout() {
+    await supabase.auth.signOut();
     setUser(null);
-    // Dispatch custom event to update header
-    window.dispatchEvent(new CustomEvent('userUpdated'));
     router.push('/');
   }
 
@@ -125,7 +120,7 @@ export default function Header() {
                 >
                   <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center">
                     <span className="text-white font-bold text-sm">
-                      {user.email.charAt(0).toUpperCase()}
+                      {user.email?.charAt(0).toUpperCase() || 'U'}
                     </span>
                   </div>
                   <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-gray-300">

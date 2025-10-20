@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getCurrentUser, updateUserProfile } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
+import { DatabaseClient } from "@/lib/database";
 
 const SUBTOPICS = ["array", "linked_list", "stack", "queue", "tree", "sorting"];
 
@@ -43,22 +44,42 @@ export default function ProfilePage() {
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("return");
 
-  const [user] = useState(getCurrentUser());
+  const [user, setUser] = useState<any>(null);
   const [priorKnowledge, setPriorKnowledge] = useState<Record<string, string>>({});
   const [takenCourse, setTakenCourse] = useState("");
   const [handsOn, setHandsOn] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Initialize form with user data
+  // Load user data from database
   useEffect(() => {
-    if (user) {
-      setPriorKnowledge(user.profile_prior_knowledge || {});
-      setTakenCourse(user.profile_experience_taken_course || "");
-      setHandsOn(user.profile_experience_hands_on || "");
-      setInterests(user.profile_interest_subtopics || []);
+    async function loadUser() {
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          setUser(currentUser);
+          
+          // Load user profile from database
+          const { data: userProfile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', currentUser.id)
+            .single();
+            
+          if (userProfile) {
+            setPriorKnowledge(userProfile.profile_prior_knowledge || {});
+            setTakenCourse(userProfile.profile_experience_taken_course || "");
+            setHandsOn(userProfile.profile_experience_hands_on || "");
+            setInterests(userProfile.profile_interest_subtopics || []);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      }
     }
-  }, [user]);
+    
+    loadUser();
+  }, []);
 
   function handleInterestToggle(subtopic: string) {
     setInterests((prev) =>
@@ -86,22 +107,28 @@ export default function ProfilePage() {
     
     setLoading(true);
     
-    // Save to localStorage with new structure
-    updateUserProfile(user.id, {
-      profile_prior_knowledge: priorKnowledge,
-      profile_experience_taken_course: takenCourse,
-      profile_experience_hands_on: handsOn,
-      profile_interest_subtopics: interests,
-    });
-    
-    setTimeout(() => {
+    try {
+      // Save to database
+      await DatabaseClient.updateUserProfile(user.id, {
+        profile_prior_knowledge: priorKnowledge,
+        profile_experience_taken_course: takenCourse as 'yes' | 'no' | 'not_sure',
+        profile_experience_hands_on: handsOn as 'none' | 'some_exercises' | 'small_project' | 'large_project',
+        profile_interest_subtopics: interests,
+      });
+      
+      setTimeout(() => {
+        setLoading(false);
+        if (returnTo) {
+          router.push(returnTo);
+        } else {
+          router.push("/home");
+        }
+      }, 800);
+    } catch (error) {
+      console.error('Failed to save profile:', error);
       setLoading(false);
-      if (returnTo) {
-        router.push(returnTo);
-      } else {
-        router.push("/home");
-      }
-    }, 800);
+      alert('Failed to save profile. Please try again.');
+    }
   }
 
   const completedSections = [

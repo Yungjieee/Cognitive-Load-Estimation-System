@@ -4,13 +4,15 @@ import { QUESTION_TYPES } from './constants';
 
 // Base question interface
 export interface BaseQuestion {
-  id: string;
-  subtopic_id: string;
+  id: string | number;
+  subtopic_id: string | number;
   difficulty: number; // 1-5
   qtype: string;
   prompt: string;
   hint?: string;
   example?: string;
+  explanation?: string;
+  hints?: string[];
   enabled: boolean;
 }
 
