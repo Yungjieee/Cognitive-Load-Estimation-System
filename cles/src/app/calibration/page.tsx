@@ -1,13 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { liveStreamsManager } from "@/lib/liveStreams";
+import HRSparkline from "@/components/HRSparkline";
+import { useSensorConnection } from "@/lib/hooks/useSensorConnection";
+import { useDeviceCommands } from "@/lib/hooks/useDeviceCommands";
+import { useRealtimeUpdates } from "@/lib/hooks/useRealtimeUpdates";
+import { DatabaseClient } from "@/lib/database";
+import { supabase } from "@/lib/supabase";
 
 export default function CalibrationPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const subtopicId = searchParams.get("subtopic");
+  const subtopicId = searchParams.get("subtopic") || "arrays"; // Default to arrays if not specified
 
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceStable, setFaceStable] = useState(false);
@@ -15,14 +21,71 @@ export default function CalibrationPage() {
   const [countdown, setCountdown] = useState(10);
   const [calibrationPassed, setCalibrationPassed] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
+  const [rmssdBaseline, setRmssdBaseline] = useState<number | null>(null);
+  const rmssdCalculatedRef = useRef(false); // Track if RMSSD has been calculated
   const [streamStatus, setStreamStatus] = useState(liveStreamsManager.getStatus());
   const [currentHR, setCurrentHR] = useState(75);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [dbSessionId, setDbSessionId] = useState<number | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [mode, setMode] = useState<'support' | 'no_support'>('support');
+  
+  // Sensor connection status
+  const { sensorStatus, isConnected, isOnline, isChecking, hasError } = useSensorConnection();
+  
+  // Device commands
+  const { isLoading: isCommandLoading, sendCommand, startCalibration: sendCalibrationCommand, stopSession, lastResult } = useDeviceCommands();
+  
+  // Real-time updates from ESP32
+  const { calibrationState, currentBPM, sensorStatus: wsSensorStatus, resetCalibration } = useRealtimeUpdates(dbSessionId || undefined);
+  
+  // Unified sensor status - prioritize WebSocket status if available
+  const unifiedSensorStatus = wsSensorStatus === 'online' ? 'online' : 
+                              wsSensorStatus === 'offline' ? 'offline' : 
+                              isOnline ? 'online' : 'offline';
+
+  // Load user data on mount (but DON'T create session yet)
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('User not authenticated - redirecting to login...');
+          alert('Please log in first to use the calibration feature');
+          router.push('/auth/sign-in?redirect=/calibration');
+          return;
+        }
+        
+        setUserId(user.id);
+        console.log('✅ User authenticated:', user.id);
+        
+        // Load user settings
+        const { data: userProfile } = await supabase
+          .from('users')
+          .select('settings_mode')
+          .eq('id', user.id)
+          .single();
+          
+        if (userProfile?.settings_mode) {
+          setMode(userProfile.settings_mode);
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+      }
+    };
+    
+    loadUser();
+  }, [router]);
 
   // Initialize streams on mount
   useEffect(() => {
     const initializeStreams = async () => {
       try {
+        // Start WebSocket and MQTT services
+        await fetch('/api/services/start', { method: 'POST' });
+        console.log('✅ Services started');
+        
         await liveStreamsManager.initialize();
         setStreamStatus(liveStreamsManager.getStatus());
         
@@ -74,19 +137,249 @@ export default function CalibrationPage() {
       return () => clearTimeout(timer);
     } else if (calibrating && countdown === 0) {
       setCalibrating(false);
-      setCalibrationPassed(true);
+      // Don't set calibrationPassed=true here - wait for RMSSD calculation
+      // setCalibrationPassed(true);  // Moved to after RMSSD calculation
     }
   }, [calibrating, countdown]);
 
-  function startCalibration() {
-    setCalibrating(true);
-    setCountdown(10);
-    setHrSignal([]);
+  // Define calculateRMSSDBaseline function before useEffect
+  const calculateRMSSDBaseline = useCallback(async () => {
+    try {
+      // Use the actual dbSessionId from state
+      const sessionIdToUse = dbSessionId;
+      
+      if (!sessionIdToUse) {
+        console.error('❌ No session ID for RMSSD calculation');
+        console.error('dbSessionId state:', dbSessionId);
+        return;
+      }
+
+      console.log(`📊 Calculating RMSSD baseline for session ${sessionIdToUse}...`);
+      const response = await fetch(`/api/sessions/${sessionIdToUse}/calculate-baseline`, {
+        method: 'POST'
+      });
+      
+      console.log(`📡 API Response status: ${response.status}`);
+      const data = await response.json();
+      console.log(`📡 API Response data:`, data);
+      
+      if (data.success) {
+        console.log(`✅ RMSSD baseline calculated: ${data.rmssdBase.toFixed(2)}ms from ${data.beatCount} beats`);
+        console.log(`💾 Storing RMSSD baseline in state: ${data.rmssdBase}`);
+        
+        // Store RMSSD baseline for display
+        setRmssdBaseline(data.rmssdBase);
+        setCalibrationPassed(true);
+        
+        console.log(`✅ RMSSD baseline state updated: ${data.rmssdBase}`);
+      } else {
+        console.error('Failed to calculate RMSSD:', data.error);
+        console.error('Response data:', data);
+        // If not enough beats, require recalibration
+        if (data.beatCount !== undefined && data.beatCount < 10) {
+          setCalibrating(false);
+          setCountdown(0);
+          alert(`Only ${data.beatCount} beats detected. Please try calibration again to ensure at least 10 beats are captured.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating RMSSD:', error);
+      console.error('Full error details:', JSON.stringify(error, null, 2));
+    }
+  }, [dbSessionId]);
+
+  // Listen for calibration_complete message from ESP32
+  useEffect(() => {
+    console.log('🔍 calibrationState check:', {
+      isComplete: calibrationState.isComplete,
+      calibrationPassed,
+      dbSessionId,
+      shouldCalculate: calibrationState.isComplete && !calibrationPassed && dbSessionId
+    });
+    
+    // Check if RMSSD hasn't been calculated yet
+    const needsCalculation = calibrationState.isComplete && !rmssdCalculatedRef.current && dbSessionId;
+    
+    if (needsCalculation) {
+      console.log('📡 Received calibration_complete from ESP32, calculating RMSSD...');
+      console.log('📡 RMSSD calculation state:', { 
+        isComplete: calibrationState.isComplete, 
+        hasRmssd: !!rmssdBaseline,
+        alreadyCalculated: rmssdCalculatedRef.current,
+        dbSessionId 
+      });
+      
+      // Calculate RMSSD directly here to avoid dependency issues
+      const calculateBaseline = async () => {
+        try {
+          const sessionIdToUse = dbSessionId;
+          
+          if (!sessionIdToUse) {
+            console.error('❌ No session ID for RMSSD calculation');
+            return;
+          }
+
+          console.log(`📊 Calculating RMSSD baseline for session ${sessionIdToUse}...`);
+          const response = await fetch(`/api/sessions/${sessionIdToUse}/calculate-baseline`, {
+            method: 'POST'
+          });
+          
+          console.log(`📡 API Response status: ${response.status}`);
+          const data = await response.json();
+          console.log(`📡 API Response data:`, data);
+          
+          if (data.success) {
+            console.log(`✅ RMSSD baseline calculated: ${data.rmssdBase.toFixed(2)}ms from ${data.beatCount} beats`);
+            setRmssdBaseline(data.rmssdBase);
+            setCalibrationPassed(true);
+            rmssdCalculatedRef.current = true; // Mark as calculated only on success
+          } else {
+            // Handle insufficient beats gracefully
+            if (data.beatCount !== undefined && data.beatCount < 10) {
+              console.log(`⚠️ Insufficient beats for calibration: ${data.beatCount} beats detected. User can retry.`);
+              setCalibrating(false);
+              setCountdown(0);
+              alert(`Only ${data.beatCount} beats detected during calibration. Please ensure your sensor is properly connected and try again.`);
+              // Reset calibration state so user can retry
+              resetCalibration();
+              rmssdCalculatedRef.current = false; // Allow retry
+            } else {
+              // Other errors
+              console.error('Failed to calculate RMSSD:', data.error);
+              setCalibrating(false);
+              setCountdown(0);
+              alert('Calibration failed. Please try again.');
+              resetCalibration();
+              rmssdCalculatedRef.current = false;
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating RMSSD:', error);
+          setCalibrating(false);
+          setCountdown(0);
+          alert('Error during calibration. Please try again.');
+          resetCalibration();
+          rmssdCalculatedRef.current = false; // Allow retry
+        }
+      };
+      
+      calculateBaseline();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // rmssdBaseline is checked in condition, not needed as dependency
+  }, [calibrationState.isComplete, calibrationPassed, dbSessionId]);
+
+  async function startCalibration() {
+    try {
+      // Reset RMSSD calculation tracking for new calibration
+      rmssdCalculatedRef.current = false;
+      setRmssdBaseline(null);
+      
+      let sessionId = dbSessionId;
+      
+      // First, create database session if not exists
+      if (!sessionId) {
+        if (!userId) {
+          console.error('❌ User not logged in');
+          alert('Please log in first');
+          router.push('/auth/sign-in?redirect=/calibration');
+          return;
+        }
+        
+        if (!subtopicId) {
+          console.error('❌ Missing subtopicId (this should not happen with default)');
+          return;
+        }
+        
+        console.log('📝 Creating database session...');
+        console.log('   User ID:', userId);
+        console.log('   Subtopic:', subtopicId);
+        
+        // Get subtopic ID from key
+        const subtopic = await DatabaseClient.getSubtopic(subtopicId);
+        if (!subtopic) {
+          console.error('❌ Invalid subtopic:', subtopicId);
+          alert(`Invalid subtopic: ${subtopicId}. Using default "arrays"`);
+          return;
+        }
+        
+        // Ensure user record exists
+        const { data: { user } } = await supabase.auth.getUser();
+        await DatabaseClient.ensureUserRecord(userId, user?.email || '');
+        
+        // Create database session
+        const dbSession = await DatabaseClient.createSession({
+          user_id: userId,
+          subtopic_id: subtopic.id,
+          mode: mode || 'support'
+        });
+        
+        console.log('✅ Database session created:', dbSession.id);
+        sessionId = dbSession.id;
+        setDbSessionId(sessionId);
+      }
+      
+      // Now send calibrate command to ESP32
+      if (!sessionId) {
+        console.error('❌ Database session creation failed');
+        return;
+      }
+      
+      // Reset calibration state
+      resetCalibration();
+      
+      // Send calibrate command only - ESP32 will handle starting/stopping session
+      console.log(`📡 Sending calibrate command for session ${sessionId}...`);
+      const calibrateResult = await sendCommand(sessionId, 'calibrate');
+      
+      if (calibrateResult.success) {
+        setCalibrating(true);
+        setCountdown(10);
+        setHrSignal([]);
+        console.log(`✅ Calibration started for session ID: ${sessionId}`);
+        console.log('⏳ Waiting for ESP32 to send calibration_done message...');
+      } else {
+        console.error('❌ Failed to send calibration command:', calibrateResult.error);
+      }
+    } catch (error) {
+      console.error('❌ Error starting calibration:', error);
+    }
   }
 
   function startTask() {
-    router.push(`/session?subtopic=${subtopicId}`);
+    if (!dbSessionId) {
+      console.error('❌ Database session not created yet');
+      return;
+    }
+    // Pass session ID to session page
+    router.push(`/session?subtopic=${subtopicId}&sessionId=${dbSessionId}`);
   }
+
+  // Debug function to check services status
+  const checkServicesStatus = async () => {
+    try {
+      const response = await fetch('/api/services/status');
+      const data = await response.json();
+      console.log('🔍 Services status:', data);
+      alert(`Services Status:\nWebSocket: ${data.websocket.running ? 'Running' : 'Not Running'}\nPort: ${data.websocket.port}\nMessage: ${data.websocket.message}`);
+    } catch (error) {
+      console.error('Failed to check services status:', error);
+      alert('Failed to check services status');
+    }
+  };
+
+  // Manual start services function
+  const startServices = async () => {
+    try {
+      const response = await fetch('/api/services/start', { method: 'POST' });
+      const data = await response.json();
+      console.log('🚀 Services start result:', data);
+      alert(`Services Start:\nSuccess: ${data.success}\nMessage: ${data.message}\nWebSocket: ${data.websocket?.running ? 'Running' : 'Not Running'}`);
+    } catch (error) {
+      console.error('Failed to start services:', error);
+      alert('Failed to start services');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -125,9 +418,14 @@ export default function CalibrationPage() {
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <div className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  {unifiedSensorStatus === 'online' && <div className="w-3 h-3 rounded-full bg-green-500" />}
+                  {isChecking && unifiedSensorStatus !== 'online' && <div className="w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />}
+                  {hasError && <div className="w-3 h-3 rounded-full bg-red-500" />}
+                  {unifiedSensorStatus === 'offline' && !isChecking && !hasError && <div className="w-3 h-3 rounded-full bg-gray-400" />}
                 </div>
-                <span className="text-sm font-medium text-gray-900 dark:text-white">Heart-rate sensor connected</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  ESP32 sensor {unifiedSensorStatus === 'online' ? 'detected' : isChecking ? 'checking...' : hasError ? 'error' : 'not detected'}
+                </span>
               </div>
             </div>
           </div>
@@ -193,58 +491,108 @@ export default function CalibrationPage() {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Heart Rate Signal</h2>
             </div>
             
-            <div className="mb-4">
-              <div className="text-2xl font-bold gradient-text">{currentHR}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">bpm</div>
-            </div>
-            
-            <div className="h-40 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 p-4">
-              {hrSignal.length > 0 ? (
-                <div className="h-full flex items-end gap-1">
-                  {hrSignal.map((value, i) => {
-                    const maxHR = Math.max(...hrSignal);
-                    const minHR = Math.min(...hrSignal);
-                    const range = maxHR - minHR || 1;
-                    const height = Math.max(2, ((value - minHR) / range) * 100);
-                    
-                    return (
-                      <div
-                        key={i}
-                        className="bg-gradient-to-t from-purple-500 to-pink-500 rounded-sm flex-1 min-h-[2px]"
-                        style={{ height: `${height}%` }}
-                      />
-                    );
-                  })}
+            <div className="space-y-4">
+              <HRSparkline 
+                sessionId={dbSessionId || 0} // Use database session ID
+                isActive={calibrating || calibrationPassed}
+                className="w-full"
+              />
+              
+              <div className="text-center">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  {calibrationState.isActive ? 'Collecting baseline data...' : 
+                   calibrationState.isComplete ? 'Baseline established' : 
+                   calibrating ? 'Calibrating...' :
+                   'Ready for calibration'}
                 </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-center">
-                  <div>
-                    <div className="text-2xl mb-2">📊</div>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">
-                      {calibrating ? `Starting in ${countdown}s...` : 'Ready to calibrate'}
-                    </div>
+                {calibrationState.isActive && (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">
+                    Progress: {calibrationState.progress}/10 seconds
                   </div>
-                </div>
-              )}
-            </div>
-            
-            {calibrating && (
-              <div className="text-center mt-4">
-                <div className="text-3xl font-bold gradient-text">{countdown}</div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">seconds remaining</div>
+                )}
+                {calibrating && !calibrationState.isActive && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                    {countdown} seconds remaining
+                    </div>
+                )}
+                {calibrationPassed && rmssdBaseline && (
+                  <div className="text-xs text-green-600 dark:text-green-400">
+                    RMSSD Baseline: {rmssdBaseline.toFixed(1)}ms
+                  </div>
+                )}
+                {calibrationPassed && !rmssdBaseline && (
+                  <div className="text-xs text-orange-600 dark:text-orange-400">
+                    RMSSD value not available
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
 
-        <div className="mt-12 flex justify-center">
+        <div className="mt-12 flex flex-col items-center gap-4">
+          {unifiedSensorStatus === 'offline' && !isChecking && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 max-w-md">
+              <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                <span className="text-lg">⚠️</span>
+                <span className="text-sm font-medium">
+                  {hasError ? 'Sensor connection error. Please check your ESP32 device.' : 
+                   'ESP32 heart rate sensor not detected. Please ensure your ESP32 device is powered on, connected to Wi-Fi, and sending heart rate data.'}
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {unifiedSensorStatus === 'online' && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 max-w-md">
+              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
+                <span className="text-lg">✅</span>
+                <span className="text-sm font-medium">
+                  ESP32 heart rate sensor detected and ready for calibration
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {/* Debug buttons for troubleshooting */}
+          <div className="flex gap-4 justify-center">
+            <button
+              onClick={checkServicesStatus}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
+            >
+              🔍 Check Services Status
+            </button>
+            <button
+              onClick={startServices}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
+            >
+              🚀 Start Services
+            </button>
+          </div>
+          
+          {lastResult && !lastResult.success && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 max-w-md">
+              <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
+                <span className="text-lg">❌</span>
+                <span className="text-sm font-medium">
+                  Failed to send command: {lastResult.error}
+                </span>
+              </div>
+            </div>
+          )}
+          
           {!calibrationPassed ? (
             <button
               onClick={startCalibration}
-              disabled={calibrating || !faceDetected}
+              disabled={calibrating || !faceDetected || unifiedSensorStatus !== 'online' || isCommandLoading}
               className="rounded-xl px-8 py-4 btn-primary text-white font-semibold text-lg disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300"
             >
-              {calibrating ? (
+              {isCommandLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  Sending command...
+                </div>
+              ) : calibrating ? (
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                   Calibrating...
@@ -260,7 +608,12 @@ export default function CalibrationPage() {
                   <span className="text-green-600 dark:text-green-400 text-2xl">✓</span>
                 </div>
                 <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Calibration Complete!</h3>
-                <p className="text-green-700 dark:text-green-300 text-sm">Your devices are ready for monitoring</p>
+                <p className="text-green-700 dark:text-green-300 text-sm mb-2">Your devices are ready for monitoring</p>
+                {rmssdBaseline && (
+                  <p className="text-green-600 dark:text-green-400 text-xs">
+                    RMSSD Baseline: {rmssdBaseline.toFixed(1)}ms
+                  </p>
+                )}
               </div>
               <button
                 onClick={startTask}

@@ -34,6 +34,7 @@ export interface SessionState {
   totalPenalties: number;
   events: any[];
   isCompleted: boolean;
+  startedAt: string;
 }
 
 export interface SessionResult {
@@ -91,7 +92,8 @@ class SessionEngine {
       totalScore: 0,
       totalPenalties: 0,
       events: [],
-      isCompleted: false
+      isCompleted: false,
+      startedAt: new Date().toISOString()
     };
 
     this.stateUpdateCallback = onStateUpdate;
@@ -183,10 +185,78 @@ class SessionEngine {
     // Start timer
     timerController.start();
 
+    // Emit question_start boundary for HRV tracking
+    this.emitQuestionBoundary(questionIndex + 1, 'question_start');
+
     // Schedule stressor banner
     this.scheduleStressorBanner();
 
     this.updateState();
+  }
+
+  // Emit question boundary for HRV tracking
+  private async emitQuestionBoundary(qIndex: number, eventType: 'question_start' | 'question_end'): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      const timestamp = Date.now() - new Date(this.state.startedAt).getTime();
+
+      console.log(`📍 Emitting boundary: Session ${this.state.sessionId}, Q${qIndex} ${eventType} at ${timestamp}ms`);
+
+      // Call the API endpoint to mark question boundary
+      const response = await fetch(`/api/sessions/${this.state.sessionId}/mark`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          qIndex,
+          timestamp,
+          eventType
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Boundary marked successfully: Q${qIndex} ${eventType}`);
+      } else {
+        const errorData = await response.json();
+        console.error(`❌ Failed to mark boundary (${response.status}):`, errorData);
+      }
+    } catch (error) {
+      console.error('❌ Error emitting question boundary:', error);
+    }
+  }
+
+  // Calculate HRV for a question
+  private async calculateQuestionHRV(qIndex: number): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      console.log(`📊 Calculating HRV for Q${qIndex}...`);
+
+      const response = await fetch(`/api/sessions/${this.state.sessionId}/calculate-question-hrv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ qIndex })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ HRV calculated for Q${qIndex}:`, data.hrvMetrics);
+
+        if (data.warning) {
+          console.warn(`⚠️ HRV warning for Q${qIndex}:`, data.warning);
+        }
+      } else {
+        const error = await response.json();
+        console.warn(`Failed to calculate HRV for Q${qIndex}:`, error.error || response.statusText);
+      }
+    } catch (error) {
+      console.warn('Error calculating question HRV:', error);
+    }
   }
 
   // Schedule stressor banner to appear at random time
@@ -308,6 +378,12 @@ class SessionEngine {
     // Show reveal
     this.state.showReveal = true;
     this.state.isPaused = true;
+
+    // Emit question_end boundary for HRV tracking
+    await this.emitQuestionBoundary(questionIndex + 1, 'question_end');
+
+    // Calculate HRV for this question
+    await this.calculateQuestionHRV(questionIndex + 1);
 
     // Log answer submission
     this.logEvent(EVENT_TYPES.ANSWER_SUBMIT, {
@@ -489,6 +565,12 @@ class SessionEngine {
       questionIndex
     });
 
+    // Emit question_end boundary for HRV tracking
+    await this.emitQuestionBoundary(questionIndex + 1, 'question_end');
+
+    // Calculate HRV for this question (even if skipped - valuable stress data)
+    await this.calculateQuestionHRV(questionIndex + 1);
+
     // Move to next question or end session
     this.nextQuestion();
   }
@@ -559,6 +641,25 @@ class SessionEngine {
       await DatabaseClient.updateSessionScore(parseInt(this.state.sessionId), finalScore);
     } catch (error) {
       console.error('Failed to update session score:', error);
+    }
+
+    // Process HRV data for all questions
+    try {
+      const response = await fetch(`/api/sessions/${this.state.sessionId}/process-hrv`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to process HRV data: ${response.statusText}`);
+      } else {
+        const result = await response.json();
+        console.log('HRV processing completed:', result);
+      }
+    } catch (error) {
+      console.warn('Error processing HRV data:', error);
     }
 
     const result: SessionResult = {

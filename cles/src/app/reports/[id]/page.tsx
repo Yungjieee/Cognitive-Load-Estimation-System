@@ -41,7 +41,9 @@ function generateTimelineSentences(report: any): string[] {
       wasSkipped: response?.metrics?.skipped || false,
       wasCorrect: response?.correct || false,
       timeSpent: response?.time_ms || 0,
-      exampleUsed: response?.metrics?.examplePenalty > 0 || false
+      exampleUsed: response?.metrics?.examplePenalty > 0 || false,
+      hrv: response?.metrics?.hrv || null,
+      rmssd_q: response?.metrics?.rmssd_q || null
     };
   });
   
@@ -129,6 +131,11 @@ function generateTimelineSentences(report: any): string[] {
     
     sentence += `, and the cognitive load was ${loadLevel}.`;
     
+    // Add HRV information if available
+    if (stats.hrv) {
+      sentence += ` Heart rate variability was ${stats.hrv}${stats.rmssd_q ? ` (RMSSD: ${Math.round(stats.rmssd_q)}ms)` : ''}.`;
+    }
+    
     sentences.push(sentence);
   });
   
@@ -167,6 +174,8 @@ export default function ReportPage() {
             avgLoad: 0.5, // TODO: Calculate from responses
             responses: responses,
             events: events,
+            rmssdBaseline: session.rmssd_baseline || null,
+            rmssdConfidence: session.rmssd_confidence || null,
           });
         } else {
           // No session data found
@@ -309,6 +318,18 @@ export default function ReportPage() {
                   <div className="text-xs mt-3 text-center">
                     <div className="font-semibold text-gray-900 dark:text-white">Q{index + 1}</div>
                     <div className="text-gray-600 dark:text-gray-400">{Math.round(totalLoad * 100)}%</div>
+                    {response?.metrics?.hrv && (
+                      <div className={`text-xs mt-1 px-2 py-1 rounded-full ${
+                        response.metrics.hrv === 'high' 
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      }`}>
+                        HRV: {response.metrics.hrv.toUpperCase()}
+                        {response.metrics.rmssd_q && (
+                          <span className="ml-1">({Math.round(response.metrics.rmssd_q)}ms)</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -355,6 +376,15 @@ export default function ReportPage() {
                   <div className="text-lg w-16 text-right">
                     {response?.correct ? "✓" : "✗"}
                   </div>
+                  {response?.metrics?.hrv && (
+                    <div className={`text-xs px-2 py-1 rounded-full ${
+                      response.metrics.hrv === 'high' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      HRV: {response.metrics.hrv.toUpperCase()}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -390,6 +420,112 @@ export default function ReportPage() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* HRV Summary */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">❤️</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Heart Rate Variability Analysis</h2>
+          </div>
+          
+          <div className="space-y-4">
+            {Array.from({ length: 5 }, (_, index) => {
+              const response = report.responses.find((r: any) => r.q_index === index + 1);
+              const hrvData = response?.metrics;
+              
+              if (!hrvData?.hrv) {
+                return (
+                  <div key={index} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
+                    <div className="w-12 text-sm font-semibold text-gray-900 dark:text-white">Q{index + 1}</div>
+                    <div className="flex-1 text-sm text-gray-500 dark:text-gray-400">No HRV data available</div>
+                  </div>
+                );
+              }
+              
+              return (
+                <div key={index} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
+                  <div className="w-12 text-sm font-semibold text-gray-900 dark:text-white">Q{index + 1}</div>
+                  <div className="flex-1 flex items-center gap-4">
+                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                      hrvData.hrv === 'high' 
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      HRV: {hrvData.hrv.toUpperCase()}
+                    </div>
+                    {hrvData.rmssd_q && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        RMSSD: {Math.round(hrvData.rmssd_q)}ms
+                      </div>
+                    )}
+                    {hrvData.rmssd_base && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Baseline: {Math.round(hrvData.rmssd_base)}ms
+                      </div>
+                    )}
+                    {hrvData.hrv_confidence && (
+                      <div className={`text-xs px-2 py-1 rounded-full ${
+                        hrvData.hrv_confidence === 'ok' 
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' 
+                          : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                      }`}>
+                        {hrvData.hrv_confidence === 'ok' ? 'High Confidence' : 'Low Confidence'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          
+          <div className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20">
+            <div className="text-sm text-blue-800 dark:text-blue-200">
+              <div className="font-semibold mb-2">HRV Interpretation:</div>
+              <ul className="space-y-1 text-xs">
+                <li>• <strong>High HRV:</strong> Indicates good autonomic nervous system balance and lower stress</li>
+                <li>• <strong>Low HRV:</strong> May indicate higher stress or cognitive load</li>
+                <li>• <strong>RMSSD:</strong> Root Mean Square of Successive Differences - higher values indicate better recovery</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Aggregate HRV Statistics */}
+          {(() => {
+            const questionsWithHRV = report.responses.filter((r: any) => r.metrics?.hrv);
+            const highStressCount = questionsWithHRV.filter((r: any) => r.metrics.hrv === 'low').length;
+            const lowStressCount = questionsWithHRV.filter((r: any) => r.metrics.hrv === 'high').length;
+            const avgRMSSD = questionsWithHRV.length > 0
+              ? questionsWithHRV.reduce((sum: number, r: any) => sum + (r.metrics.rmssd_q || 0), 0) / questionsWithHRV.length
+              : 0;
+            const baseline = report.rmssdBaseline || report.responses[0]?.metrics?.rmssd_base || 0;
+
+            if (questionsWithHRV.length > 0) {
+              return (
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-center">
+                    <div className="text-2xl font-bold text-green-700 dark:text-green-300">{lowStressCount}</div>
+                    <div className="text-xs text-green-600 dark:text-green-400 font-medium">Low Stress Questions</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-center">
+                    <div className="text-2xl font-bold text-red-700 dark:text-red-300">{highStressCount}</div>
+                    <div className="text-xs text-red-600 dark:text-red-400 font-medium">High Stress Questions</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-center">
+                    <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{Math.round(avgRMSSD)}<span className="text-sm">ms</span></div>
+                    <div className="text-xs text-purple-600 dark:text-purple-400 font-medium">Avg RMSSD</div>
+                  </div>
+                  <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-center">
+                    <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{Math.round(baseline)}<span className="text-sm">ms</span></div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">Baseline RMSSD</div>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
 
         {/* Narrative Insights */}

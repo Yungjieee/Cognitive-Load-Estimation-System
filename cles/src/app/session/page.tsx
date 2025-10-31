@@ -15,17 +15,24 @@ import TimeUpModal from "@/components/TimeUpModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import RevealCard from "@/components/RevealCard";
 import StressorBanner from "@/components/StressorBanner";
+import HRSparkline from "@/components/HRSparkline";
+import { useDeviceCommands } from "@/lib/hooks/useDeviceCommands";
 
 export default function SessionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const subtopicKey = searchParams.get("subtopic");
+  const existingSessionId = searchParams.get("sessionId");
 
   const [userId, setUserId] = useState<string | null>(null);
   const [mode, setMode] = useState<'support' | 'no_support'>('support');
   const [sessionState, setSessionState] = useState<SessionState | null>(null);
   const [currentAnswer, setCurrentAnswer] = useState<Answer | null>(null);
   const [showTenSecondWarning, setShowTenSecondWarning] = useState(false);
+  const [dbSessionId, setDbSessionId] = useState<number | null>(null);
+
+  // ESP32 device commands
+  const { sendCommand, stopSession } = useDeviceCommands();
 
   // Load current user and settings from Supabase
   useEffect(() => {
@@ -83,13 +90,29 @@ export default function SessionPage() {
       (async () => {
         const result = await sessionEngine.endSession();
         
+        // Stop ESP32 session
+        if (dbSessionId) {
+          await stopSession(dbSessionId);
+          console.log(`🛑 ESP32 session stopped for ID: ${dbSessionId}`);
+        }
+        
         // Stop all streams
         liveStreamsManager.cleanup();
         
         router.push(`/reports/${sessionState.sessionId}`);
       })();
     }
-  }, [sessionState?.isCompleted, router]);
+  }, [sessionState?.isCompleted, router, dbSessionId, stopSession]);
+
+  // Cleanup: Stop ESP32 session when component unmounts
+  useEffect(() => {
+    return () => {
+      if (dbSessionId) {
+        stopSession(dbSessionId);
+        console.log(`🛑 ESP32 session stopped on unmount for ID: ${dbSessionId}`);
+      }
+    };
+  }, [dbSessionId, stopSession]);
 
   function mapDifficulty(letter: 'E' | 'M' | 'H'): number {
     switch (letter) {
@@ -159,29 +182,47 @@ export default function SessionPage() {
         return;
       }
 
-      // Resolve subtopic ID by key
-      const subtopic = await DatabaseClient.getSubtopic(subtopicKey);
-      if (!subtopic) {
-        console.error('Invalid subtopic');
-        return;
+      let dbSession;
+      
+      // Use existing session if provided (from calibration page)
+      if (existingSessionId) {
+        dbSession = await DatabaseClient.getSession(existingSessionId);
+        if (!dbSession) {
+          console.error('Existing session not found');
+          return;
+        }
+        setDbSessionId(Number(existingSessionId));
+      } else {
+        // Create new session
+        const subtopic = await DatabaseClient.getSubtopic(subtopicKey);
+        if (!subtopic) {
+          console.error('Invalid subtopic');
+          return;
+        }
+
+        // Ensure user profile row exists for FK (sessions.user_id -> users.id)
+        const { data: authData } = await supabase.auth.getUser();
+        const authEmail = authData.user?.email || '';
+        await DatabaseClient.ensureUserRecord(userId, authEmail);
+
+        // Create DB session
+        dbSession = await DatabaseClient.createSession({
+          user_id: userId,
+          subtopic_id: subtopic.id,
+          mode,
+        });
+        setDbSessionId(Number(dbSession.id));
       }
 
-      // Ensure user profile row exists for FK (sessions.user_id -> users.id)
-      const { data: authData } = await supabase.auth.getUser();
-      const authEmail = authData.user?.email || '';
-      await DatabaseClient.ensureUserRecord(userId, authEmail);
-
-      // Create DB session
-      const dbSession = await DatabaseClient.createSession({
-        user_id: userId,
-        subtopic_id: subtopic.id,
-        mode,
-      });
+      if (!dbSession) {
+        console.error('Failed to get or create session');
+        return;
+      }
 
       // Fetch questions from DB: 1E/2M/2H (random within pools)
       let questionsOverride: any[] | undefined = undefined;
       try {
-        const dbQuestions = await DatabaseClient.getQuestionsForSession(String(subtopic.id));
+        const dbQuestions = await DatabaseClient.getQuestionsForSession(String(dbSession.subtopic_id));
         if (dbQuestions && dbQuestions.length > 0) {
           questionsOverride = transformDbQuestions(dbQuestions) as any[];
         }
@@ -189,17 +230,23 @@ export default function SessionPage() {
         console.error('Question fetch failed; falling back to mock:', qErr);
       }
 
-      // Initialize session engine
+      // Initialize session engine with existing session
       const initialState = sessionEngine.initialize(
         Number(dbSession.id),
         userId,
-        Number(subtopic.id),
+        Number(dbSession.subtopic_id),
         mode,
         (state) => setSessionState(state),
         questionsOverride
       );
 
       setSessionState(initialState);
+      
+      // Start ESP32 session with this session ID
+      if (dbSession.id) {
+        await sendCommand(dbSession.id, 'start');
+        console.log(`🚀 ESP32 session started with ID: ${dbSession.id}`);
+      }
     } catch (err: any) {
       console.error('Failed to start session:', err);
       const msg = err?.message || JSON.stringify(err);
@@ -484,12 +531,27 @@ export default function SessionPage() {
           </div>
 
           {/* Live Monitoring */}
-          <div className="sticky top-6">
+          <div className="sticky top-6 space-y-4">
             <SessionRightPanel
               difficulty={currentConfig?.level === 'easy' ? 1 : currentConfig?.level === 'medium' ? 2 : 3}
               hintsUsed={sessionState.hintsUsed[sessionState.currentQuestionIndex]}
               timeWarning={showTenSecondWarning}
             />
+            
+            {/* HR Monitoring */}
+            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
+                  <span className="text-white text-xs">❤️</span>
+                </div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Heart Rate</h3>
+              </div>
+              <HRSparkline 
+                sessionId={Number(sessionState.sessionId)}
+                isActive={true}
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -48,6 +48,9 @@ export interface Session {
   started_at: string
   ended_at: string | null
   score_total: number
+  rmssd_baseline?: number
+  rmssd_confidence?: 'ok' | 'low'
+  baseline_beat_count?: number
   created_at: string
   subtopics?: {
     key: string
@@ -404,6 +407,9 @@ export class DatabaseClient {
   static async updateSession(sessionId: string, updates: {
     ended_at?: string
     score_total?: number
+    rmssd_baseline?: number
+    rmssd_confidence?: 'ok' | 'low'
+    baseline_beat_count?: number
   }): Promise<Session> {
     const { data, error } = await supabase
       .from('sessions')
@@ -508,13 +514,23 @@ export class DatabaseClient {
     ibi_ms?: number
     bpm?: number
   }): Promise<HRBeat> {
-    const { data, error } = await supabase
+    // Use admin client for server-side operations (bypasses RLS)
+    const client = supabaseAdmin ?? supabase
+
+    console.log(`[DB] Inserting beat: session=${beatData.session_id}, ts=${beatData.ts_ms}ms, bpm=${beatData.bpm}`);
+
+    const { data, error } = await client
       .from('hr_beats')
       .insert([beatData])
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error(`[DB] Insert error:`, error);
+      throw error;
+    }
+
+    console.log(`[DB] Insert returned ID: ${data.id}`);
     return data
   }
 
@@ -559,6 +575,77 @@ export class DatabaseClient {
 
     if (error) throw error
     return data
+  }
+
+  // HRV-related methods
+  static async updateResponseHRVMetrics(
+    sessionId: number, 
+    qIndex: number, 
+    hrvMetrics: any
+  ): Promise<void> {
+    // Get the existing response
+    const { data: response, error: fetchError } = await supabase
+      .from('responses')
+      .select('metrics')
+      .eq('session_id', sessionId)
+      .eq('q_index', qIndex)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // Merge HRV metrics with existing metrics
+    const updatedMetrics = {
+      ...response.metrics,
+      ...hrvMetrics
+    }
+
+    // Update the response
+    const { error } = await supabase
+      .from('responses')
+      .update({ metrics: updatedMetrics })
+      .eq('session_id', sessionId)
+      .eq('q_index', qIndex)
+
+    if (error) throw error
+  }
+
+  static async markQuestionBoundary(
+    sessionId: number,
+    qIndex: number,
+    timestamp: number,
+    eventType: 'question_start' | 'question_end'
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('events')
+      .insert({
+        session_id: sessionId,
+        ts_ms: timestamp,
+        etype: eventType,
+        payload: { q_index: qIndex }
+      })
+
+    if (error) throw error
+  }
+
+  static async getQuestionBoundaries(sessionId: number): Promise<Array<{
+    q_index: number;
+    event_type: string;
+    timestamp: number;
+  }>> {
+    const { data, error } = await supabase
+      .from('events')
+      .select('ts_ms, etype, payload')
+      .eq('session_id', sessionId)
+      .in('etype', ['question_start', 'question_end'])
+      .order('ts_ms')
+
+    if (error) throw error
+
+    return data.map(event => ({
+      q_index: event.payload.q_index,
+      event_type: event.etype,
+      timestamp: event.ts_ms
+    }))
   }
 
   // Utility functions

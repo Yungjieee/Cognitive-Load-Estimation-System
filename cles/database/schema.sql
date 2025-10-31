@@ -57,6 +57,12 @@ CREATE TABLE public.sessions (
   started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ended_at TIMESTAMP WITH TIME ZONE,
   score_total DECIMAL(5,2) DEFAULT 0, -- Max 10.00 points
+  
+  -- HRV baseline fields (for audit and comparison)
+  rmssd_baseline DECIMAL(8,2), -- RMSSD baseline from calibration (milliseconds)
+  rmssd_confidence TEXT CHECK (rmssd_confidence IN ('ok', 'low')), -- Confidence in baseline quality
+  baseline_beat_count INTEGER, -- Number of beats used for baseline calculation
+  
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
