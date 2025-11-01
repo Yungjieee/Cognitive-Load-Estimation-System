@@ -58,51 +58,11 @@ export async function POST(
 
     console.log(`✅ Baseline RMSSD: ${baselineRMSSD.toFixed(2)}ms`);
 
-    // Step 2: Get question boundaries from events table
-    const boundaries = await DatabaseClient.getQuestionBoundaries(sessionId);
-    console.log(`📊 All boundaries for session ${sessionId}:`, boundaries);
+    // Step 2: Get beats for this question using q_label (much simpler!)
+    const q_label = `q${qIndex}`;
+    const questionBeats = await DatabaseClient.getQuestionBeats(String(sessionId), q_label);
 
-    const questionBoundaries = boundaries.filter(b => b.q_index === qIndex);
-    console.log(`📊 Boundaries for Q${qIndex}:`, questionBoundaries);
-
-    if (questionBoundaries.length < 2) {
-      console.error(`❌ Missing boundaries for Q${qIndex}. Found ${questionBoundaries.length} boundaries.`);
-      console.error(`   Expected: question_start and question_end`);
-      console.error(`   Available boundaries:`, questionBoundaries);
-      return NextResponse.json(
-        {
-          error: 'Question boundaries not found. Ensure both question_start and question_end were marked.',
-          found: questionBoundaries.length,
-          expected: 2,
-          boundaries: questionBoundaries
-        },
-        { status: 400 }
-      );
-    }
-
-    const startBoundary = questionBoundaries.find(b => b.event_type === 'question_start');
-    const endBoundary = questionBoundaries.find(b => b.event_type === 'question_end');
-
-    if (!startBoundary || !endBoundary) {
-      console.error(`❌ Incomplete boundaries for Q${qIndex}`);
-      return NextResponse.json(
-        { error: 'Incomplete question boundaries' },
-        { status: 400 }
-      );
-    }
-
-    const startTime = startBoundary.timestamp;
-    const endTime = endBoundary.timestamp;
-
-    console.log(`📍 Question ${qIndex} boundaries: ${startTime}ms - ${endTime}ms (duration: ${endTime - startTime}ms)`);
-
-    // Step 3: Query beats for this question time range
-    const allBeats = await DatabaseClient.getSessionHRBeats(String(sessionId));
-    const questionBeats = allBeats.filter(beat =>
-      beat.ts_ms >= startTime && beat.ts_ms <= endTime && beat.ibi_ms !== null
-    );
-
-    console.log(`💓 Found ${questionBeats.length} beats for Q${qIndex}`);
+    console.log(`💓 Retrieved ${questionBeats.length} beats for ${q_label} from database`);
 
     if (questionBeats.length < HRV_CONFIG.MIN_BEATS_PER_QUESTION) {
       console.warn(`⚠️ Not enough beats for Q${qIndex}: ${questionBeats.length} (need ${HRV_CONFIG.MIN_BEATS_PER_QUESTION})`);
@@ -187,7 +147,6 @@ export async function POST(
       success: true,
       hrvMetrics,
       beatCount: filteredBeats.length,
-      duration: endTime - startTime,
       timestamp: Date.now()
     });
 

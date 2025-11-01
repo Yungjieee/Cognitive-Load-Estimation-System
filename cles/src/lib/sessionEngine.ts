@@ -7,6 +7,7 @@ import { MOCK_QUESTIONS } from './mockQuestions';
 import { timerController } from './TimerController';
 import { eventLogger } from './eventLogger';
 import { liveStreamsManager } from './liveStreams';
+import { HRV_CONFIG } from './hrvConfig';
 
 export interface SessionState {
   sessionId: string;
@@ -185,6 +186,9 @@ class SessionEngine {
     // Start timer
     timerController.start();
 
+    // Set current question for q_label tagging (before emitting boundary)
+    this.setCurrentQuestion(questionIndex + 1);
+
     // Emit question_start boundary for HRV tracking
     this.emitQuestionBoundary(questionIndex + 1, 'question_start');
 
@@ -225,6 +229,101 @@ class SessionEngine {
       }
     } catch (error) {
       console.error('❌ Error emitting question boundary:', error);
+    }
+  }
+
+  // Set current question for q_label tagging
+  // Uses ESP32 beat timestamps as authoritative time reference
+  private async setCurrentQuestion(qIndex: number): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      const q_label = `q${qIndex}`;
+      let timestamp: number;
+
+      if (qIndex === 1) {
+        // Transitioning from calibration (q0) to Q1
+        console.log(`📊 Querying last calibration beat for Q1 boundary...`);
+
+        try {
+          const response = await fetch(
+            `/api/sessions/${this.state.sessionId}/get-last-beat?q_label=q0`
+          );
+
+          if (response.ok) {
+            const { lastBeat } = await response.json();
+
+            if (lastBeat && lastBeat.ts_ms) {
+              // Use last calibration beat timestamp + 1ms as Q1 start
+              timestamp = lastBeat.ts_ms + 1;
+              console.log(`✅ Using last calibration beat: ${lastBeat.ts_ms}ms, Q1 starts at ${timestamp}ms (ESP32 time)`);
+            } else {
+              // Fallback: Use calibration duration constant
+              timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS;
+              console.log(`⚠️ No calibration beats found, using constant: ${timestamp}ms`);
+            }
+          } else {
+            // Fallback on API error
+            timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS;
+            console.log(`⚠️ API error getting last beat, using constant: ${timestamp}ms`);
+          }
+        } catch (error) {
+          // Fallback on fetch error
+          timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS;
+          console.log(`⚠️ Error fetching last beat, using constant: ${timestamp}ms`, error);
+        }
+      } else {
+        // Transitioning between questions (Q1→Q2, Q2→Q3, etc.)
+        const previousLabel = `q${qIndex - 1}`;
+        console.log(`📊 Querying last beat from ${previousLabel} for Q${qIndex} boundary...`);
+
+        try {
+          const response = await fetch(
+            `/api/sessions/${this.state.sessionId}/get-last-beat?q_label=${previousLabel}`
+          );
+
+          if (response.ok) {
+            const { lastBeat } = await response.json();
+
+            if (lastBeat && lastBeat.ts_ms) {
+              // Use last previous question beat + 1ms as new question start
+              timestamp = lastBeat.ts_ms + 1;
+              console.log(`✅ Using last ${previousLabel} beat: ${lastBeat.ts_ms}ms, Q${qIndex} starts at ${timestamp}ms (ESP32 time)`);
+            } else {
+              // Fallback: estimate based on calibration + question times
+              timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS + (qIndex - 1) * 20000;
+              console.log(`⚠️ No beats found for ${previousLabel}, estimating: ${timestamp}ms`);
+            }
+          } else {
+            // Fallback on API error
+            timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS + (qIndex - 1) * 20000;
+            console.log(`⚠️ API error getting last beat, estimating: ${timestamp}ms`);
+          }
+        } catch (error) {
+          // Fallback on fetch error
+          timestamp = HRV_CONFIG.CALIBRATION_DURATION_MS + (qIndex - 1) * 20000;
+          console.log(`⚠️ Error fetching last beat, estimating: ${timestamp}ms`, error);
+        }
+      }
+
+      console.log(`📝 Setting session ${this.state.sessionId} to ${q_label} at timestamp ${timestamp}ms (ESP32 clock)`);
+
+      // Call set-question API with calculated timestamp
+      const response = await fetch(`/api/sessions/${this.state.sessionId}/set-question`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ q_label, timestamp })
+      });
+
+      if (response.ok) {
+        console.log(`✅ Session question set to ${q_label} at ${timestamp}ms (ESP32 clock)`);
+      } else {
+        console.error(`❌ Failed to set question (${response.status})`);
+      }
+    } catch (error) {
+      console.error('❌ Error setting current question:', error);
     }
   }
 

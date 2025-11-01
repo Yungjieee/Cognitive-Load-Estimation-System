@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { HRV_CONFIG } from '@/lib/hrvConfig';
 import { DatabaseClient } from '@/lib/database';
+import { filterIBIs, computeRMSSD, type ProcessedIBI } from '@/lib/hrvAggregator';
+import { HRV_CONFIG } from '@/lib/hrvConfig';
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
@@ -18,47 +19,50 @@ export async function POST(
     }
 
     // Get beats from database (first 10 seconds - calibration period)
-    const beatData = await getBeatsForCalibration(sessionId);
-    
-    console.log(`📊 Retrieved ${beatData.length} beats from database for calibration`);
-    
-    if (beatData.length < 10) {
-      console.log(`⚠️ Not enough beats for calibration: ${beatData.length} beats (need at least 10)`);
+    const { processedBeats, rawCount } = await getBeatsForCalibration(sessionId);
+
+    console.log(`📊 Retrieved ${rawCount} raw beats from database for calibration`);
+    console.log(`📊 After filtering: ${processedBeats.length} valid beats`);
+
+    if (processedBeats.length < HRV_CONFIG.MIN_BEATS_PER_QUESTION) {
+      console.log(`⚠️ Not enough valid beats for calibration: ${processedBeats.length} beats (need at least ${HRV_CONFIG.MIN_BEATS_PER_QUESTION})`);
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Not enough beats for calibration',
-          beatCount: beatData.length
+          beatCount: processedBeats.length,
+          rawBeatCount: rawCount
         },
         { status: 400 }
       );
     }
 
-    // Calculate baseline RMSSD
+    // Calculate baseline RMSSD using filtered beats
     console.log(`🔢 Calculating RMSSD baseline for session ${sessionId}...`);
-    console.log(`📊 IBI data sample: ${beatData.slice(0, 10).join(', ')}${beatData.length > 10 ? '...' : ''}`);
-    
-    const rmssdBase = calculateRMSSD(beatData);
-    
-    console.log(`✅ RMSSD baseline calculated: ${rmssdBase.toFixed(2)}ms (from ${beatData.length} beats)`);
-    
+    console.log(`📊 IBI data sample (filtered): ${processedBeats.slice(0, 10).map(b => b.ibi_ms).join(', ')}${processedBeats.length > 10 ? '...' : ''}`);
+
+    const rmssdBase = computeRMSSD(processedBeats);
+
+    console.log(`✅ RMSSD baseline calculated: ${rmssdBase.toFixed(2)}ms (from ${processedBeats.length} valid beats)`);
+
     // Determine confidence level based on beat count
-    const rmssdConfidence = beatData.length >= 10 ? 'ok' : 'low';
-    
+    const rmssdConfidence = processedBeats.length >= HRV_CONFIG.MIN_BEATS_PER_QUESTION ? 'ok' : 'low';
+
     // Save RMSSD baseline to database
     await DatabaseClient.updateSession(String(sessionId), {
       rmssd_baseline: rmssdBase,
       rmssd_confidence: rmssdConfidence,
-      baseline_beat_count: beatData.length
+      baseline_beat_count: processedBeats.length
     });
-    
+
     console.log(`💾 Saved RMSSD baseline to database: ${rmssdBase.toFixed(2)}ms (confidence: ${rmssdConfidence})`);
 
     return NextResponse.json({
       success: true,
       sessionId,
       rmssdBase,
-      beatCount: beatData.length,
+      beatCount: processedBeats.length,
+      rawBeatCount: rawCount,
       confidence: rmssdConfidence,
       timestamp: Date.now()
     });
@@ -72,45 +76,34 @@ export async function POST(
   }
 }
 
-async function getBeatsForCalibration(sessionId: number): Promise<number[]> {
-  // Get all beats from database for this session
-  const allBeats = await DatabaseClient.getSessionHRBeats(String(sessionId));
+async function getBeatsForCalibration(sessionId: number): Promise<{ processedBeats: ProcessedIBI[], rawCount: number }> {
+  // Get calibration beats using q_label (much simpler than timestamp filtering!)
+  const calibrationBeats = await DatabaseClient.getQuestionBeats(String(sessionId), 'q0');
 
-  console.log(`📊 Total beats in database for session ${sessionId}: ${allBeats.length}`);
+  console.log(`📊 Retrieved ${calibrationBeats.length} calibration beats (q0) from database for session ${sessionId}`);
 
-  if (allBeats.length === 0) {
-    return [];
+  if (calibrationBeats.length === 0) {
+    return { processedBeats: [], rawCount: 0 };
   }
 
-  // Sort by ts_ms to ensure chronological order (should already be sorted, but ensuring)
-  allBeats.sort((a, b) => a.ts_ms - b.ts_ms);
+  // Filter out null IBI values
+  const validBeats = calibrationBeats.filter(beat => beat.ibi_ms !== null);
 
-  // Get first 10 seconds worth of beats (calibration period)
-  // Since ESP32 sends ts as milliseconds from session start,
-  // we filter beats where ts_ms <= 10000
-  const calibrationEndMs = HRV_CONFIG.CALIBRATION_DURATION_MS;
-  const calibrationBeats = allBeats.filter(beat => beat.ts_ms <= calibrationEndMs);
-
-  console.log(`📊 Filtered to ${calibrationBeats.length} beats within calibration period (0-${calibrationEndMs}ms)`);
-
-  if (calibrationBeats.length > 0) {
-    console.log(`📊 Calibration beat timestamps: ${calibrationBeats.slice(0, 5).map(b => b.ts_ms).join(', ')}${calibrationBeats.length > 5 ? '...' : ''}`);
+  if (validBeats.length > 0) {
+    console.log(`📊 Calibration beat timestamps: ${validBeats.slice(0, 5).map(b => b.ts_ms).join(', ')}${validBeats.length > 5 ? '...' : ''}`);
   }
 
-  // Return IBI values for RMSSD calculation
-  return calibrationBeats
-    .map(beat => beat.ibi_ms)
-    .filter(ibi => ibi !== null) as number[];
-}
+  // Convert to ProcessedIBI format
+  const processedBeats: ProcessedIBI[] = validBeats.map(beat => ({
+    ibi_ms: beat.ibi_ms as number,
+    timestamp: beat.ts_ms
+  }));
 
-function calculateRMSSD(ibiData: number[]): number {
-  if (ibiData.length < 2) return 0;
-  
-  let sumOfSquares = 0;
-  for (let i = 0; i < ibiData.length - 1; i++) {
-    const diff = ibiData[i + 1] - ibiData[i];
-    sumOfSquares += diff * diff;
-  }
-  
-  return Math.sqrt(sumOfSquares / (ibiData.length - 1));
+  // Filter out physiologically invalid beats (IBI < 300ms or > 2000ms, large deltas)
+  const filteredBeats = filterIBIs(processedBeats);
+
+  return {
+    processedBeats: filteredBeats,
+    rawCount: validBeats.length
+  };
 }

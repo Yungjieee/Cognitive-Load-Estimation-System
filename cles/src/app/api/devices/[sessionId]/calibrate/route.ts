@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mqtt from 'mqtt';
+import { DatabaseClient } from '@/lib/database';
+import { setSessionQuestion } from '@/lib/mqttReceiver';
 
 const MQTT_BROKER = process.env.MQTT_BROKER || 'mqtt://localhost:1883';
 
@@ -16,7 +18,7 @@ function getMQTTClient(): mqtt.MqttClient {
 export async function POST(request: NextRequest) {
   try {
     const { sessionId, command } = await request.json();
-    
+
     if (!sessionId || !command) {
       return NextResponse.json(
         { error: 'Missing sessionId or command' },
@@ -24,9 +26,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If this is a calibrate command, delete old calibration beats first
+    if (command === 'calibrate') {
+      console.log(`🧹 Deleting old calibration beats for session ${sessionId}...`);
+      await DatabaseClient.deleteCalibrationBeats(String(sessionId));
+
+      // Set session to calibration mode (q0) starting at timestamp 0
+      setSessionQuestion(sessionId, 'q0', 0);
+    }
+
     const client = getMQTTClient();
     const topic = `cles/hr/${sessionId}/ctrl`;
-    
+
     // Send command to ESP32
     const message = JSON.stringify({
       cmd: command,

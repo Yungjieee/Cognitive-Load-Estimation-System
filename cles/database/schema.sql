@@ -98,6 +98,7 @@ CREATE TABLE public.hr_beats (
   ts_ms BIGINT NOT NULL, -- Timestamp in milliseconds from session start
   ibi_ms INTEGER, -- Inter-beat interval in milliseconds
   bpm INTEGER, -- Beats per minute
+  q_label TEXT DEFAULT 'q0', -- Question label: 'q0' for calibration, 'q1'-'q5' for questions
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -127,6 +128,7 @@ CREATE INDEX idx_responses_session_id ON public.responses(session_id);
 CREATE INDEX idx_responses_question_id ON public.responses(question_id);
 CREATE INDEX idx_events_session_id ON public.events(session_id);
 CREATE INDEX idx_hr_beats_session_id ON public.hr_beats(session_id);
+CREATE INDEX idx_hr_beats_session_q_label ON public.hr_beats(session_id, q_label);
 CREATE INDEX idx_nasa_tlx_blocks_session_id ON public.nasa_tlx_blocks(session_id);
 
 -- Row Level Security (RLS) policies

@@ -94,6 +94,7 @@ export interface HRBeat {
   ts_ms: number
   ibi_ms: number | null
   bpm: number | null
+  q_label: string
   created_at: string
 }
 
@@ -410,6 +411,7 @@ export class DatabaseClient {
     rmssd_baseline?: number
     rmssd_confidence?: 'ok' | 'low'
     baseline_beat_count?: number
+    current_question?: number
   }): Promise<Session> {
     const { data, error } = await supabase
       .from('sessions')
@@ -420,6 +422,17 @@ export class DatabaseClient {
 
     if (error) throw error
     return data
+  }
+
+  static async getCurrentQuestion(sessionId: string): Promise<number> {
+    const { data, error} = await supabase
+      .from('sessions')
+      .select('current_question')
+      .eq('id', sessionId)
+      .single()
+
+    if (error) throw error
+    return data.current_question ?? 0
   }
 
   static async getUserSessions(userId: string): Promise<Session[]> {
@@ -513,11 +526,12 @@ export class DatabaseClient {
     ts_ms: number
     ibi_ms?: number
     bpm?: number
+    q_label?: string
   }): Promise<HRBeat> {
     // Use admin client for server-side operations (bypasses RLS)
     const client = supabaseAdmin ?? supabase
 
-    console.log(`[DB] Inserting beat: session=${beatData.session_id}, ts=${beatData.ts_ms}ms, bpm=${beatData.bpm}`);
+    console.log(`[DB] Inserting beat: session=${beatData.session_id}, ts=${beatData.ts_ms}ms, bpm=${beatData.bpm}, q_label=${beatData.q_label || 'q0'}`);
 
     const { data, error } = await client
       .from('hr_beats')
@@ -530,18 +544,86 @@ export class DatabaseClient {
       throw error;
     }
 
-    console.log(`[DB] Insert returned ID: ${data.id}`);
+    console.log(`[DB] Insert returned ID: ${data.id}, q_label=${data.q_label}`);
     return data
   }
 
-  static async getSessionHRBeats(sessionId: string): Promise<HRBeat[]> {
+  static async getSessionHRBeats(sessionId: string, q_label?: string): Promise<HRBeat[]> {
+    let query = supabase
+      .from('hr_beats')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+
+    if (q_label) {
+      query = query.eq('q_label', q_label)
+    }
+
+    const { data, error } = await query.order('ts_ms')
+
+    if (error) throw error
+    return data
+  }
+
+  static async deleteCalibrationBeats(sessionId: string): Promise<void> {
+    const client = supabaseAdmin ?? supabase
+    const { error } = await client
+      .from('hr_beats')
+      .delete()
+      .eq('session_id', Number(sessionId))
+      .eq('q_label', 'q0')
+
+    if (error) throw error
+    console.log(`🗑️ [DB] Deleted calibration beats (q0) for session ${sessionId}`)
+  }
+
+  static async getQuestionBeats(sessionId: string, q_label: string): Promise<HRBeat[]> {
+    const { data, error} = await supabase
+      .from('hr_beats')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+      .eq('q_label', q_label)
+      .order('ts_ms')
+
+    if (error) throw error
+    return data
+  }
+
+  /**
+   * Get the last beat for a specific q_label (used for boundary calculation)
+   * Returns null if no beats found
+   */
+  static async getLastBeatByLabel(sessionId: string, q_label: string): Promise<HRBeat | null> {
     const { data, error } = await supabase
       .from('hr_beats')
       .select('*')
       .eq('session_id', Number(sessionId))
-      .order('ts_ms')
+      .eq('q_label', q_label)
+      .order('ts_ms', { ascending: false })
+      .limit(1)
+      .single()
 
-    if (error) throw error
+    if (error) {
+      if (error.code === 'PGRST116') return null // No rows found
+      throw error
+    }
+
+    return data
+  }
+
+  static async getLastBeatForSession(sessionId: string): Promise<HRBeat | null> {
+    const { data, error } = await supabase
+      .from('hr_beats')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+      .order('ts_ms', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // No rows found
+      throw error
+    }
+
     return data
   }
 

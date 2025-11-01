@@ -424,13 +424,23 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       Serial.println(sessionId);
       // Set the sessionId and activate session before starting calibration
       currentSessionId = sessionId;
-      sessionStartTime = millis();  // Reset session start time for calibration
+
+      // Only set sessionStartTime if this is a new session (not already running)
+      if (sessionStartTime == 0) {
+        sessionStartTime = millis();
+        Serial.print("⏱️ Session clock started at: ");
+        Serial.println(sessionStartTime);
+      } else {
+        Serial.println("⏱️ Session clock already running, continuing...");
+        Serial.print("   Clock has been running for: ");
+        Serial.print(millis() - sessionStartTime);
+        Serial.println("ms");
+      }
+
       isSessionActive = true;  // Activate session immediately
       // Reset beat counter for this calibration session
       beatCounter = 0;
       Serial.println("Beat counter reset to 0");
-      Serial.print("Session start time set to: ");
-      Serial.println(sessionStartTime);
       // Now start calibration with active session
       calibrateSensor();
     } else {
@@ -455,7 +465,13 @@ void handleSerialCommands() {
       if (!isSessionActive && currentSessionId == 0) {
         Serial.println("⚠️ No active session. Please use START_SESSION:N first, or use remote calibrate command.");
       } else {
-        sessionStartTime = millis();  // Reset session start time
+        // Only set sessionStartTime if not already set
+        if (sessionStartTime == 0) {
+          sessionStartTime = millis();
+          Serial.println("⏱️ Session clock started for calibration");
+        } else {
+          Serial.println("⏱️ Session clock already running, continuing...");
+        }
         calibrateSensor();
       }
     } else if (command.startsWith("START_SESSION:")) {
@@ -475,14 +491,26 @@ void handleSerialCommands() {
 
 void startSession(int sessionId) {
   currentSessionId = sessionId;
-  sessionStartTime = millis();
+
+  // Only set sessionStartTime if it's not already set (i.e., no calibration was done)
+  // This prevents the clock from resetting when transitioning from calibration to questions
+  if (sessionStartTime == 0) {
+    sessionStartTime = millis();
+    Serial.println("⏱️ Session clock started (no prior calibration)");
+  } else {
+    Serial.println("⏱️ Session clock continues from calibration");
+    Serial.print("   Clock has been running for: ");
+    Serial.print(millis() - sessionStartTime);
+    Serial.println("ms");
+  }
+
   isSessionActive = true;
-  
+
   Serial.println();
   Serial.print("Session started: ");
   Serial.println(sessionId);
   Serial.println("Heart rate data will be sent via MQTT");
-  
+
   // Step 10: Subscribe to control topic for this session
   if (mqttConnected) {
     String controlTopic = "cles/hr/" + String(sessionId) + "/ctrl";
@@ -490,24 +518,29 @@ void startSession(int sessionId) {
     Serial.print("Subscribed to control topic: ");
     Serial.println(controlTopic);
   }
-  
+
   Serial.println();
-  
+
   // Reset heart rate variables
   BPM = 0;
   currentIBI = 0;
   lastBeat = 0;
-  
-  // Reset beat counter
-  beatCounter = 0;
+
+  // Do NOT reset beat counter - continue counting from calibration
+  // beatCounter maintains continuous count across calibration → questions
+  Serial.print("Beat counter continuing from: ");
+  Serial.println(beatCounter);
 }
 
 void stopSession() {
   isSessionActive = false;
   currentSessionId = 0;
-  
+  sessionStartTime = 0;  // Reset clock for next session
+  beatCounter = 0;       // Reset beat counter for next session
+
   Serial.println();
   Serial.println("Session stopped");
+  Serial.println("⏱️ Clock and beat counter reset for next session");
   Serial.println();
 }
 
