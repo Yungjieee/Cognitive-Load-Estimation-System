@@ -24,14 +24,18 @@ export async function POST(
     console.log(`📊 Retrieved ${rawCount} raw beats from database for calibration`);
     console.log(`📊 After filtering: ${processedBeats.length} valid beats`);
 
+    // CALIBRATION REQUIREMENT: Must have at least MIN_BEATS_PER_QUESTION valid beats
+    // If not, user must recalibrate
     if (processedBeats.length < HRV_CONFIG.MIN_BEATS_PER_QUESTION) {
       console.log(`⚠️ Not enough valid beats for calibration: ${processedBeats.length} beats (need at least ${HRV_CONFIG.MIN_BEATS_PER_QUESTION})`);
+      console.log(`🔄 User must recalibrate to get valid baseline`);
       return NextResponse.json(
         {
           success: false,
-          error: 'Not enough beats for calibration',
+          error: 'Not enough beats for calibration - please recalibrate',
           beatCount: processedBeats.length,
-          rawBeatCount: rawCount
+          rawBeatCount: rawCount,
+          minRequired: HRV_CONFIG.MIN_BEATS_PER_QUESTION
         },
         { status: 400 }
       );
