@@ -57,12 +57,13 @@ CREATE TABLE public.sessions (
   started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   ended_at TIMESTAMP WITH TIME ZONE,
   score_total DECIMAL(5,2) DEFAULT 0, -- Max 10.00 points
-  
+  attention_rate DECIMAL(5,2), -- Overall session attention rate: (total_focused / total_captures) * 100
+
   -- HRV baseline fields (for audit and comparison)
   rmssd_baseline DECIMAL(8,2), -- RMSSD baseline from calibration (milliseconds)
   rmssd_confidence TEXT CHECK (rmssd_confidence IN ('ok', 'low')), -- Confidence in baseline quality
   baseline_beat_count INTEGER, -- Number of beats used for baseline calculation
-  
+
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -77,6 +78,7 @@ CREATE TABLE public.responses (
   time_ms INTEGER,
   hints_used INTEGER DEFAULT 0,
   extra_time_used BOOLEAN DEFAULT FALSE,
+  attention_rate DECIMAL(5,2), -- Attention rate for this question: (focused_count / total_count) * 100
   metrics JSONB DEFAULT '{}', -- { attention: 'high'|'low', hrv: 'high'|'low', overall, intrinsic, extraneous, germane }
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -99,6 +101,16 @@ CREATE TABLE public.hr_beats (
   ibi_ms INTEGER, -- Inter-beat interval in milliseconds
   bpm INTEGER, -- Beats per minute
   q_label TEXT DEFAULT 'q0', -- Question label: 'q0' for calibration, 'q1'-'q5' for questions
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Attention events table (captures every 5 seconds during session)
+CREATE TABLE public.attention_events (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT REFERENCES public.sessions(id) ON DELETE CASCADE,
+  timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  attention_status TEXT NOT NULL CHECK (attention_status IN ('FOCUSED', 'DISTRACTED')),
+  q_label TEXT NOT NULL, -- 'q1', 'q2', 'q3', 'q4', 'q5'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -129,6 +141,9 @@ CREATE INDEX idx_responses_question_id ON public.responses(question_id);
 CREATE INDEX idx_events_session_id ON public.events(session_id);
 CREATE INDEX idx_hr_beats_session_id ON public.hr_beats(session_id);
 CREATE INDEX idx_hr_beats_session_q_label ON public.hr_beats(session_id, q_label);
+CREATE INDEX idx_attention_events_session_id ON public.attention_events(session_id);
+CREATE INDEX idx_attention_events_session_q_label ON public.attention_events(session_id, q_label);
+CREATE INDEX idx_attention_events_timestamp ON public.attention_events(timestamp);
 CREATE INDEX idx_nasa_tlx_blocks_session_id ON public.nasa_tlx_blocks(session_id);
 
 -- Row Level Security (RLS) policies
@@ -137,6 +152,7 @@ ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hr_beats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attention_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nasa_tlx_blocks ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own data
@@ -173,6 +189,12 @@ CREATE POLICY "Users can view own hr_beats" ON public.hr_beats
 CREATE POLICY "Users can create own hr_beats" ON public.hr_beats
   FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
+CREATE POLICY "Users can view own attention_events" ON public.attention_events
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can create own attention_events" ON public.attention_events
+  FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
 CREATE POLICY "Users can view own nasa_tlx_blocks" ON public.nasa_tlx_blocks
   FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
@@ -206,6 +228,9 @@ CREATE POLICY "Service role can manage all events" ON public.events
   FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "Service role can manage all hr_beats" ON public.hr_beats
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role can manage all attention_events" ON public.attention_events
   FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "Service role can manage all nasa_tlx_blocks" ON public.nasa_tlx_blocks

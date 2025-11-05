@@ -28,13 +28,14 @@ export default function SessionRightPanel({
   offscreenRate = 0
 }: SessionRightPanelProps) {
   const [streamStatus, setStreamStatus] = useState(liveStreamsManager.getStatus());
+  const [attentionStatus, setAttentionStatus] = useState<'FOCUSED' | 'DISTRACTED'>('DISTRACTED');
   const [cognitiveLoad, setCognitiveLoad] = useState<CognitiveLoad>({
     overall: 0.5,
     intrinsic: 0.2,
     extraneous: 0.2,
     germane: 0.6
   });
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
 
   // Initialize streams and update data
   useEffect(() => {
@@ -42,14 +43,6 @@ export default function SessionRightPanel({
       try {
         await liveStreamsManager.initialize();
         setStreamStatus(liveStreamsManager.getStatus());
-        
-        // Connect video element to webcam stream
-        if (videoRef.current) {
-          const stream = liveStreamsManager.getWebcamStream();
-          if (stream) {
-            videoRef.current.srcObject = stream;
-          }
-        }
       } catch (error) {
         console.warn('Failed to initialize streams:', error);
       }
@@ -58,8 +51,19 @@ export default function SessionRightPanel({
     initializeStreams();
 
     // Update data every second
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       setStreamStatus(liveStreamsManager.getStatus());
+
+      // Fetch attention status from Python backend
+      try {
+        const response = await fetch('http://localhost:5001/status');
+        if (response.ok) {
+          const data = await response.json();
+          setAttentionStatus(data.status as 'FOCUSED' | 'DISTRACTED');
+        }
+      } catch (error) {
+        // Silently fail - backend might not be available
+      }
 
       // Update cognitive load
       updateCognitiveLoad();
@@ -121,38 +125,31 @@ export default function SessionRightPanel({
         </div>
         
         <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 relative overflow-hidden">
-          {streamStatus.webcam.active ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-              style={{ transform: 'scaleX(-1)' }} // Mirror the video
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-2xl mb-2">📷</div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {streamStatus.webcam.error || 'Camera not available'}
-                </div>
-              </div>
-            </div>
-          )}
-          
+          <img
+            ref={imgRef}
+            src="http://localhost:5001/video_feed"
+            alt="Attention Monitor"
+            className="w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }}
+          />
+
           {/* Face detection indicator */}
           <div className="absolute top-2 right-2">
             <div className={`w-3 h-3 rounded-full ${
-              streamStatus.webcam.faceDetected 
-                ? 'bg-green-500' 
+              streamStatus.webcam.faceDetected
+                ? 'bg-green-500'
                 : 'bg-red-500'
             }`} />
           </div>
         </div>
-        
-        <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-          Face: {streamStatus.webcam.faceDetected ? 'Detected' : 'Not detected'}
+
+        <div className="mt-2 flex gap-2 justify-center flex-wrap">
+          <div className={`px-2 py-1 rounded-full text-xs font-medium ${streamStatus.webcam.faceDetected ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
+            Face: {streamStatus.webcam.faceDetected ? 'Detected' : 'Not detected'}
+          </div>
+          <div className={`px-2 py-1 rounded-full text-xs font-medium ${attentionStatus === 'FOCUSED' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'}`}>
+            {attentionStatus}
+          </div>
         </div>
       </div>
 
@@ -189,14 +186,12 @@ export default function SessionRightPanel({
       </div>
 
       {/* Stream Health */}
-      {!streamStatus.webcam.active || !streamStatus.hr.active ? (
+      {!streamStatus.webcam.active ? (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
           <div className="flex items-center gap-2">
             <span className="text-yellow-600 dark:text-yellow-400 text-sm">⚠️</span>
             <div className="text-xs text-yellow-800 dark:text-yellow-200">
-              {!streamStatus.webcam.active && 'Webcam not available'}
-              {!streamStatus.webcam.active && !streamStatus.hr.active && ' • '}
-              {!streamStatus.hr.active && 'HR monitoring not available'}
+              Webcam not available
             </div>
           </div>
         </div>

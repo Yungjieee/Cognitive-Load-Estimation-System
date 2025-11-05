@@ -88,16 +88,16 @@ export default function SessionPage() {
     if (sessionState?.isCompleted) {
       (async () => {
         const result = await sessionEngine.endSession();
-        
+
         // Stop ESP32 session
         if (dbSessionId) {
           await stopSession(dbSessionId);
           console.log(`🛑 ESP32 session stopped for ID: ${dbSessionId}`);
         }
-        
+
         // Stop all streams
         liveStreamsManager.cleanup();
-        
+
         router.push(`/reports/${sessionState.sessionId}`);
       })();
     }
@@ -224,12 +224,17 @@ export default function SessionPage() {
         const dbQuestions = await DatabaseClient.getQuestionsForSession(String(dbSession.subtopic_id));
         if (dbQuestions && dbQuestions.length > 0) {
           questionsOverride = transformDbQuestions(dbQuestions) as any[];
+        } else {
+          alert('No questions found for this subtopic. Please ensure questions are added to the database.');
+          return;
         }
       } catch (qErr) {
-        console.error('Question fetch failed; falling back to mock:', qErr);
+        console.error('Failed to fetch questions from database:', qErr);
+        alert('Failed to load questions from database. Please try again or contact support.');
+        return;
       }
 
-      // Initialize session engine with existing session
+      // Initialize session engine with questions from database
       const initialState = sessionEngine.initialize(
         Number(dbSession.id),
         userId,
@@ -259,7 +264,7 @@ export default function SessionPage() {
 
   async function handleSubmit() {
     if (!currentAnswer || !sessionState) return;
-    
+
     await sessionEngine.submitAnswer(currentAnswer);
     setCurrentAnswer(null);
   }

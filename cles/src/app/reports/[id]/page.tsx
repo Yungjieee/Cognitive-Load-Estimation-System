@@ -172,6 +172,7 @@ export default function ReportPage() {
             score: session.score_total || 0,
             totalTime: calculateSessionDuration(session.started_at, session.ended_at || session.started_at),
             avgLoad: 0.5, // TODO: Calculate from responses
+            attentionRate: session.attention_rate || null,
             responses: responses,
             events: events,
             rmssdBaseline: session.rmssd_baseline || null,
@@ -269,7 +270,7 @@ export default function ReportPage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Overview</h2>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
               <div className="text-3xl font-bold gradient-text">Score {report.score}/10</div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Score</div>
@@ -285,6 +286,12 @@ export default function ReportPage() {
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-orange-50 to-purple-50 dark:from-orange-900/20 dark:to-purple-900/20">
               <div className="text-3xl font-bold gradient-text">{report.mode === "support" ? "Support" : "No-Support"}</div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Mode</div>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-cyan-50 to-purple-50 dark:from-cyan-900/20 dark:to-purple-900/20">
+              <div className="text-3xl font-bold gradient-text">
+                {report.attentionRate !== null && report.attentionRate !== undefined ? `${Math.round(report.attentionRate)}%` : 'N/A'}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Attention Rate</div>
             </div>
           </div>
         </div>
@@ -376,10 +383,21 @@ export default function ReportPage() {
                   <div className="text-lg w-16 text-right">
                     {response?.correct ? "✓" : "✗"}
                   </div>
+                  {response?.attention_rate !== null && response?.attention_rate !== undefined && (
+                    <div className={`text-xs px-2 py-1 rounded-full ${
+                      response.attention_rate >= 70
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : response.attention_rate >= 50
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    }`}>
+                      ATT: {Math.round(response.attention_rate)}%
+                    </div>
+                  )}
                   {response?.metrics?.hrv && (
                     <div className={`text-xs px-2 py-1 rounded-full ${
-                      response.metrics.hrv === 'high' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
+                      response.metrics.hrv === 'high'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                         : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
                     }`}>
                       HRV: {response.metrics.hrv.toUpperCase()}

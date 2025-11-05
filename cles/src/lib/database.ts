@@ -48,6 +48,7 @@ export interface Session {
   started_at: string
   ended_at: string | null
   score_total: number
+  attention_rate?: number
   rmssd_baseline?: number
   rmssd_confidence?: 'ok' | 'low'
   baseline_beat_count?: number
@@ -68,6 +69,7 @@ export interface Response {
   time_ms: number | null
   hints_used: number
   extra_time_used: boolean
+  attention_rate?: number
   metrics: {
     attention?: 'high' | 'low'
     hrv?: 'high' | 'low'

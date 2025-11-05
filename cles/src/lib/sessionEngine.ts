@@ -3,7 +3,6 @@
 
 import { SCHEDULE, PENALTY_HINT_PER_USE, PENALTY_EXTRA_TIME_TOTAL, EXTRA_TIME_FACTOR, EVENT_TYPES } from './config';
 import { Question, Answer } from './questionTypes';
-import { MOCK_QUESTIONS } from './mockQuestions';
 import { timerController } from './TimerController';
 import { eventLogger } from './eventLogger';
 import { liveStreamsManager } from './liveStreams';
@@ -53,8 +52,10 @@ class SessionEngine {
   private state: SessionState | null = null;
   private stateUpdateCallback: ((state: SessionState) => void) | null = null;
   private stressorTimeout: NodeJS.Timeout | null = null;
+  private attentionCaptureInterval: NodeJS.Timeout | null = null;
+  private pythonBackendUrl: string = 'http://localhost:5001';
 
-  // Initialize session with questions provided by caller (preferred)
+  // Initialize session with questions from database
   initialize(
     sessionId: number | string,
     userId: string,
@@ -63,10 +64,12 @@ class SessionEngine {
     onStateUpdate: (state: SessionState) => void,
     questionsOverride?: Question[]
   ): SessionState {
-    // Use provided questions if available, otherwise fallback to mock
-    const questions = questionsOverride && questionsOverride.length > 0
-      ? questionsOverride
-      : this.selectQuestions(String(subtopicId));
+    // Questions must be provided from database
+    if (!questionsOverride || questionsOverride.length === 0) {
+      throw new Error('No questions provided. Questions must be fetched from the database before initializing the session.');
+    }
+
+    const questions = questionsOverride;
 
     this.state = {
       sessionId: String(sessionId),
@@ -191,6 +194,11 @@ class SessionEngine {
 
     // Emit question_start boundary for HRV tracking
     this.emitQuestionBoundary(questionIndex + 1, 'question_start');
+
+    // Start attention capture on first question
+    if (questionIndex === 0 && !this.attentionCaptureInterval) {
+      this.startAttentionCapture();
+    }
 
     // Schedule stressor banner
     this.scheduleStressorBanner();
@@ -358,6 +366,117 @@ class SessionEngine {
     }
   }
 
+  // Start capturing attention status every 5 seconds
+  private startAttentionCapture(): void {
+    if (!this.state) return;
+
+    console.log('✅ Starting attention capture for session:', this.state.sessionId);
+
+    this.attentionCaptureInterval = setInterval(async () => {
+      if (!this.state || this.state.isCompleted) {
+        console.log('⏸️ Session completed, stopping attention capture');
+        this.stopAttentionCapture();
+        return;
+      }
+
+      try {
+        const qLabel = `q${this.state.currentQuestionIndex + 1}`;
+
+        // Fetch attention status from Python backend
+        const response = await fetch(`${this.pythonBackendUrl}/status`);
+        if (!response.ok) {
+          console.error('❌ Python backend returned error:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+
+        // Check state again after async operation
+        if (!this.state || this.state.isCompleted) {
+          console.log('⏸️ Session state changed during fetch, skipping capture');
+          return;
+        }
+
+        // Insert to database via API
+        const captureResponse = await fetch('/api/attention/capture', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: this.state.sessionId,
+            attention_status: data.status,
+            q_label: qLabel
+          })
+        });
+
+        if (!captureResponse.ok) {
+          const errorData = await captureResponse.json();
+          console.error('❌ Failed to capture attention:', errorData);
+          return;
+        }
+
+        console.log(`📸 Captured attention: ${data.status} for ${qLabel}`);
+      } catch (error) {
+        console.error('❌ Failed to capture attention:', error);
+      }
+    }, 5000); // Every 5 seconds
+  }
+
+  // Stop attention capture interval
+  private stopAttentionCapture(): void {
+    if (this.attentionCaptureInterval) {
+      clearInterval(this.attentionCaptureInterval);
+      this.attentionCaptureInterval = null;
+      console.log('🛑 Stopped attention capture');
+    }
+  }
+
+  // Calculate attention rate for a question
+  private async calculateQuestionAttentionRate(qIndex: number): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      const qLabel = `q${qIndex}`;
+      console.log(`📊 Calculating attention rate for ${qLabel}...`);
+
+      const response = await fetch(
+        `/api/attention/question-rate?session_id=${this.state.sessionId}&q_label=${qLabel}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Attention rate for ${qLabel}: ${data.attention_rate}% (${data.focused_count}/${data.total_count})`);
+      } else {
+        const error = await response.json();
+        console.warn(`Failed to calculate attention rate for ${qLabel}:`, error.error || response.statusText);
+      }
+    } catch (error) {
+      console.warn('Error calculating question attention rate:', error);
+    }
+  }
+
+  // Calculate overall session attention rate
+  private async calculateSessionAttentionRate(): Promise<void> {
+    if (!this.state) return;
+
+    try {
+      console.log('📊 Calculating overall session attention rate...');
+
+      const response = await fetch(
+        `/api/attention/session-rate?session_id=${this.state.sessionId}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`✅ Overall session attention rate: ${data.attention_rate}% (${data.focused_count}/${data.total_count})`);
+      } else {
+        const error = await response.json();
+        console.warn('Failed to calculate session attention rate:', error.error || response.statusText);
+      }
+    } catch (error) {
+      console.warn('Error calculating session attention rate:', error);
+    }
+  }
+
   // Schedule stressor banner to appear at random time
   private scheduleStressorBanner(): void {
     if (!this.state || this.state.mode === 'no_support') return;
@@ -483,6 +602,9 @@ class SessionEngine {
 
     // Calculate HRV for this question
     await this.calculateQuestionHRV(questionIndex + 1);
+
+    // Calculate attention rate for this question
+    await this.calculateQuestionAttentionRate(questionIndex + 1);
 
     // Log answer submission
     this.logEvent(EVENT_TYPES.ANSWER_SUBMIT, {
@@ -670,6 +792,9 @@ class SessionEngine {
     // Calculate HRV for this question (even if skipped - valuable stress data)
     await this.calculateQuestionHRV(questionIndex + 1);
 
+    // Calculate attention rate for this question (even if skipped)
+    await this.calculateQuestionAttentionRate(questionIndex + 1);
+
     // Move to next question or end session
     this.nextQuestion();
   }
@@ -761,6 +886,12 @@ class SessionEngine {
       console.warn('Error processing HRV data:', error);
     }
 
+    // Stop attention capture
+    this.stopAttentionCapture();
+
+    // Calculate overall session attention rate
+    await this.calculateSessionAttentionRate();
+
     const result: SessionResult = {
       sessionId: this.state.sessionId,
       totalScore: finalScore,
@@ -776,13 +907,6 @@ class SessionEngine {
     this.updateState();
 
     return result;
-  }
-
-  // Select questions for session (mock implementation)
-  private selectQuestions(subtopicId: string): Question[] {
-    // For now, return the first 5 mock questions
-    // In a real implementation, this would query the database
-    return MOCK_QUESTIONS.slice(0, 5);
   }
 
   // Log event
@@ -829,7 +953,10 @@ class SessionEngine {
       clearTimeout(this.stressorTimeout);
       this.stressorTimeout = null;
     }
-    
+
+    // Stop attention capture
+    this.stopAttentionCapture();
+
     // Force stop timer before cleanup
     timerController.forceStop();
     timerController.cleanup();

@@ -17,14 +17,13 @@ export default function CalibrationPage() {
 
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceStable, setFaceStable] = useState(false);
-  const [hrSignal, setHrSignal] = useState<number[]>([]);
+  const [attentionStatus, setAttentionStatus] = useState<'FOCUSED' | 'DISTRACTED'>('DISTRACTED');
   const [countdown, setCountdown] = useState(10);
   const [calibrationPassed, setCalibrationPassed] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
   const [rmssdBaseline, setRmssdBaseline] = useState<number | null>(null);
   const rmssdCalculatedRef = useRef(false); // Track if RMSSD has been calculated
   const [streamStatus, setStreamStatus] = useState(liveStreamsManager.getStatus());
-  const [currentHR, setCurrentHR] = useState(75);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [dbSessionId, setDbSessionId] = useState<number | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -103,12 +102,23 @@ export default function CalibrationPage() {
 
     initializeStreams();
 
-    // Update face detection status
-    const faceCheckInterval = setInterval(() => {
+    // Update face detection status and attention status
+    const faceCheckInterval = setInterval(async () => {
       const status = liveStreamsManager.getStatus();
       setStreamStatus(status);
       setFaceDetected(status.webcam.faceDetected);
-      
+
+      // Fetch attention status from Python backend
+      try {
+        const response = await fetch('http://localhost:5001/status');
+        if (response.ok) {
+          const data = await response.json();
+          setAttentionStatus(data.status as 'FOCUSED' | 'DISTRACTED');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch attention status:', error);
+      }
+
       // Check if face has been stable for 8+ seconds
       if (status.webcam.faceDetected && !faceStable) {
         setTimeout(() => {
@@ -129,10 +139,6 @@ export default function CalibrationPage() {
     if (calibrating && countdown > 0) {
       const timer = setTimeout(() => {
         setCountdown(countdown - 1);
-        // Get real HR data from streams
-        const hr = liveStreamsManager.getCurrentHR();
-        setCurrentHR(hr);
-        setHrSignal(prev => [...prev.slice(-9), hr]);
       }, 1000);
       return () => clearTimeout(timer);
     } else if (calibrating && countdown === 0) {
@@ -335,7 +341,6 @@ export default function CalibrationPage() {
       if (calibrateResult.success) {
         setCalibrating(true);
         setCountdown(10);
-        setHrSignal([]);
         console.log(`✅ Calibration started for session ID: ${sessionId}`);
         console.log('⏳ Waiting for ESP32 to send calibration_done message...');
       } else {
@@ -439,16 +444,18 @@ export default function CalibrationPage() {
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Webcam Preview</h2>
             </div>
             <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 relative overflow-hidden">
-              {streamStatus.webcam.active ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="w-full h-full object-cover"
-                  style={{ transform: 'scaleX(-1)' }} // Mirror the video
-                />
-              ) : (
+              <img
+                src="http://localhost:5001/video_feed"
+                alt="Webcam Feed"
+                className="w-full h-full object-cover"
+                style={{ transform: 'scaleX(-1)' }}
+                onError={(e) => {
+                  console.error('Failed to load video feed from Python backend');
+                  // Hide the image on error
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              {!streamStatus.webcam.active && (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="text-center">
                     <div className="w-20 h-20 mx-auto mb-4 rounded-2xl gradient-bg flex items-center justify-center">
@@ -472,9 +479,12 @@ export default function CalibrationPage() {
               </div>
             </div>
             
-            <div className="mt-4 flex gap-2 justify-center">
+            <div className="mt-4 flex gap-2 justify-center flex-wrap">
               <div className={`px-3 py-1 rounded-full text-xs font-medium ${faceDetected ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
                 Face: {faceDetected ? 'Detected' : 'Not detected'}
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${attentionStatus === 'FOCUSED' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'}`}>
+                Status: {attentionStatus}
               </div>
               <div className={`px-3 py-1 rounded-full text-xs font-medium ${faceStable ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'}`}>
                 Stable: {faceStable ? 'Yes' : 'No'}
