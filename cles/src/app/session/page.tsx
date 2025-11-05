@@ -15,7 +15,6 @@ import TimeUpModal from "@/components/TimeUpModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import RevealCard from "@/components/RevealCard";
 import StressorBanner from "@/components/StressorBanner";
-import HRSparkline from "@/components/HRSparkline";
 import { useDeviceCommands } from "@/lib/hooks/useDeviceCommands";
 
 export default function SessionPage() {
@@ -531,27 +530,13 @@ export default function SessionPage() {
           </div>
 
           {/* Live Monitoring */}
-          <div className="sticky top-6 space-y-4">
+          <div className="sticky top-6">
             <SessionRightPanel
+              sessionId={Number(sessionState.sessionId)}
               difficulty={currentConfig?.level === 'easy' ? 1 : currentConfig?.level === 'medium' ? 2 : 3}
               hintsUsed={sessionState.hintsUsed[sessionState.currentQuestionIndex]}
               timeWarning={showTenSecondWarning}
             />
-            
-            {/* HR Monitoring */}
-            <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
-                  <span className="text-white text-xs">❤️</span>
-                </div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Heart Rate</h3>
-              </div>
-              <HRSparkline 
-                sessionId={Number(sessionState.sessionId)}
-                isActive={true}
-                className="w-full"
-              />
-            </div>
           </div>
         </div>
       </div>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { liveStreamsManager, HRDataPoint, AttentionData } from "@/lib/liveStreams";
+import { liveStreamsManager } from "@/lib/liveStreams";
 import { COGNITIVE_LOAD_WEIGHTS } from "@/lib/config";
+import HRSparkline from "./HRSparkline";
 
 interface CognitiveLoad {
   overall: number;
@@ -12,28 +13,27 @@ interface CognitiveLoad {
 }
 
 interface SessionRightPanelProps {
+  sessionId: number;
   difficulty: number;
   hintsUsed: number;
   timeWarning: boolean;
   offscreenRate?: number;
 }
 
-export default function SessionRightPanel({ 
-  difficulty, 
-  hintsUsed, 
-  timeWarning, 
-  offscreenRate = 0 
+export default function SessionRightPanel({
+  sessionId,
+  difficulty,
+  hintsUsed,
+  timeWarning,
+  offscreenRate = 0
 }: SessionRightPanelProps) {
   const [streamStatus, setStreamStatus] = useState(liveStreamsManager.getStatus());
-  const [hrData, setHrData] = useState<HRDataPoint[]>([]);
-  const [attentionData, setAttentionData] = useState<AttentionData[]>([]);
   const [cognitiveLoad, setCognitiveLoad] = useState<CognitiveLoad>({
     overall: 0.5,
     intrinsic: 0.2,
     extraneous: 0.2,
     germane: 0.6
   });
-  const [currentHR, setCurrentHR] = useState(75);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Initialize streams and update data
@@ -60,10 +60,7 @@ export default function SessionRightPanel({
     // Update data every second
     const interval = setInterval(() => {
       setStreamStatus(liveStreamsManager.getStatus());
-      setHrData(liveStreamsManager.getHRSparkline());
-      setAttentionData(liveStreamsManager.getAttentionData());
-      setCurrentHR(liveStreamsManager.getCurrentHR());
-      
+
       // Update cognitive load
       updateCognitiveLoad();
     }, 1000);
@@ -92,35 +89,6 @@ export default function SessionRightPanel({
       extraneous: Math.max(0, Math.min(1, extraneous)),
       germane: Math.max(0, Math.min(1, germane))
     });
-  };
-
-  // Render HR sparkline
-  const renderHRSparkline = () => {
-    if (hrData.length === 0) {
-      return (
-        <div className="h-20 flex items-center justify-center text-gray-400 text-sm">
-          No HR data
-        </div>
-      );
-    }
-
-    const maxHR = Math.max(...hrData.map(d => d.bpm));
-    const minHR = Math.min(...hrData.map(d => d.bpm));
-    const range = maxHR - minHR || 1;
-
-    return (
-      <div className="h-20 flex items-end gap-1">
-        {hrData.slice(-60).map((point, i) => (
-          <div
-            key={i}
-            className="bg-gradient-to-t from-purple-500 to-pink-500 rounded-sm flex-1 min-h-[2px]"
-            style={{ 
-              height: `${Math.max(2, ((point.bpm - minHR) / range) * 100)}%` 
-            }}
-          />
-        ))}
-      </div>
-    );
   };
 
   // Render cognitive load bar
@@ -188,7 +156,7 @@ export default function SessionRightPanel({
         </div>
       </div>
 
-      {/* HR Sparkline */}
+      {/* Heart Rate */}
       <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
@@ -196,15 +164,11 @@ export default function SessionRightPanel({
           </div>
           <h3 className="text-sm font-bold text-gray-900 dark:text-white">Heart Rate</h3>
         </div>
-        
-        <div className="mb-2">
-          <div className="text-2xl font-bold gradient-text">{currentHR}</div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">bpm</div>
-        </div>
-        
-        <div className="h-20 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-lg p-2">
-          {renderHRSparkline()}
-        </div>
+        <HRSparkline
+          sessionId={sessionId}
+          isActive={true}
+          className="w-full"
+        />
       </div>
 
       {/* Cognitive Load Panel */}
