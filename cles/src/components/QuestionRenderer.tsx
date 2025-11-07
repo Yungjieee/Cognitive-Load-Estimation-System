@@ -2,6 +2,7 @@
 
 import { Question, Answer, MCQAnswer, MatchingAnswer, ReorderAnswer, ShortAnswer } from '@/lib/questionTypes';
 import { useState } from 'react';
+import ImageLightbox from './ImageLightbox';
 
 interface QuestionRendererProps {
   question: Question;
@@ -14,6 +15,7 @@ export default function QuestionRenderer({ question, answer, onAnswerChange, dis
   const [matchingPairs, setMatchingPairs] = useState<Record<string, string>>({});
   const [reorderItems, setReorderItems] = useState<string[]>(question.qtype === 'reorder' ? [...(question as any).sequence] : []);
   const [shortAnswer, setShortAnswer] = useState<string>('');
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   const handleMCQAnswer = (selected: string) => {
     onAnswerChange({ type: 'mcq', selected } as MCQAnswer);
@@ -65,15 +67,21 @@ export default function QuestionRenderer({ question, answer, onAnswerChange, dis
       <div className="space-y-4">
         {imageQuestion.media?.imgUrl && (
           <div className="flex justify-center">
-            <img 
-              src={imageQuestion.media.imgUrl} 
-              alt="Question image" 
-              className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600"
-              onError={(e) => {
-                // Fallback for missing images
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            <div className="relative group">
+              <img
+                src={imageQuestion.media.imgUrl}
+                alt="Question image"
+                className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setLightboxImage(imageQuestion.media.imgUrl)}
+                onError={(e) => {
+                  // Fallback for missing images
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+              <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                Click to zoom
+              </div>
+            </div>
           </div>
         )}
         {renderMCQ()}
@@ -172,17 +180,49 @@ export default function QuestionRenderer({ question, answer, onAnswerChange, dis
     );
   };
 
+  const renderImageShort = () => {
+    const imageQuestion = question as any;
+    return (
+      <div className="space-y-4">
+        {imageQuestion.media?.imgUrl && (
+          <div className="flex justify-center">
+            <img
+              src={imageQuestion.media.imgUrl}
+              alt="Question image"
+              className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600"
+              onError={(e) => {
+                // Fallback for missing images
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+        {renderShortAnswer()}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+      <h2 className="text-gray-900 dark:text-white">
         {question.prompt}
       </h2>
-      
+
       {question.qtype === 'mcq' && renderMCQ()}
       {question.qtype === 'image_mcq' && renderImageMCQ()}
       {question.qtype === 'matching' && renderMatching()}
       {question.qtype === 'reorder' && renderReorder()}
       {question.qtype === 'short' && renderShortAnswer()}
+      {question.qtype === 'image_short' && renderImageShort()}
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <ImageLightbox
+          src={lightboxImage}
+          alt="Question image"
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </div>
   );
 }

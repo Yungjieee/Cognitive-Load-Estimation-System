@@ -131,6 +131,7 @@ export default function SessionPage() {
       const hintText = hintsArray[0] || null;
       // Prefer explicit DB 'example' column; fallback to legacy 'explanation' or second hint
       const exampleText = q.example || q.explanation || hintsArray[1] || null;
+
       if (q.qtype === 'mcq') {
         const optionsArray: string[] = Array.isArray(q.options) ? q.options : (q.options ? JSON.parse(q.options) : []);
         const answerArray: string[] = Array.isArray(q.answer_key) ? q.answer_key : (q.answer_key ? JSON.parse(q.answer_key) : []);
@@ -148,21 +149,75 @@ export default function SessionPage() {
           answer_key: { correct: correctKey },
           hint: hintText,
           example: exampleText,
+          example_image_url: q.example_image_url || null,
           explanation: q.explanation || null,
           hints: hintsArray,
           enabled: q.enabled,
         };
       }
+
+      if (q.qtype === 'image_mcq') {
+        const optionsArray: string[] = Array.isArray(q.options) ? q.options : (q.options ? JSON.parse(q.options) : []);
+        const answerArray: string[] = Array.isArray(q.answer_key) ? q.answer_key : (q.answer_key ? JSON.parse(q.answer_key) : []);
+        const options = optionsArray.map((text, idx) => ({ key: LETTERS[idx] || String(idx+1), text }));
+        const correctText = answerArray[0];
+        const correctIndex = optionsArray.findIndex(t => t === correctText);
+        const correctKey = correctIndex >= 0 ? (LETTERS[correctIndex] || String(correctIndex+1)) : (LETTERS[0] || 'A');
+        return {
+          id: Number(q.id),
+          subtopic_id: Number(q.subtopic_id),
+          difficulty: mapDifficulty(q.difficulty as 'E'|'M'|'H'),
+          qtype: 'image_mcq',
+          prompt: q.prompt,
+          media: {
+            imgUrl: q.image_url || ''
+          },
+          options,
+          answer_key: { correct: correctKey },
+          hint: hintText,
+          example: exampleText,
+          example_image_url: q.example_image_url || null,
+          explanation: q.explanation || null,
+          hints: hintsArray,
+          enabled: q.enabled,
+        };
+      }
+
+      if (q.qtype === 'image_short') {
+        const answerArray: string[] = Array.isArray(q.answer_key) ? q.answer_key : (q.answer_key ? JSON.parse(q.answer_key) : []);
+        const regexPattern = answerArray[0] || '.*';
+        return {
+          id: Number(q.id),
+          subtopic_id: Number(q.subtopic_id),
+          difficulty: mapDifficulty(q.difficulty as 'E'|'M'|'H'),
+          qtype: 'image_short',
+          prompt: q.prompt,
+          media: {
+            imgUrl: q.image_url || ''
+          },
+          answer_key: { regex: regexPattern },
+          hint: hintText,
+          example: exampleText,
+          example_image_url: q.example_image_url || null,
+          explanation: q.explanation || null,
+          hints: hintsArray,
+          enabled: q.enabled,
+        };
+      }
+
       // Treat unknown types (e.g., 'code', 'short') as short-answer
+      const answerArray: string[] = Array.isArray(q.answer_key) ? q.answer_key : (q.answer_key ? JSON.parse(q.answer_key) : []);
+      const regexPattern = answerArray[0] || '.*';
       return {
         id: Number(q.id),
         subtopic_id: Number(q.subtopic_id),
         difficulty: mapDifficulty(q.difficulty as 'E'|'M'|'H'),
         qtype: 'short',
         prompt: q.prompt,
-        answer_key: { regex: '.*' },
+        answer_key: { regex: regexPattern },
         hint: hintText,
         example: exampleText,
+        example_image_url: q.example_image_url || null,
         explanation: q.explanation || null,
         hints: hintsArray,
         enabled: q.enabled,

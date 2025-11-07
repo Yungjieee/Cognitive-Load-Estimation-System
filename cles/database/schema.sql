@@ -37,12 +37,15 @@ CREATE TABLE public.questions (
   id BIGSERIAL PRIMARY KEY,
   subtopic_id BIGINT REFERENCES public.subtopics(id) ON DELETE CASCADE,
   difficulty TEXT NOT NULL CHECK (difficulty IN ('E', 'M', 'H')), -- Easy, Medium, Hard
-  qtype TEXT NOT NULL CHECK (qtype IN ('mcq', 'short', 'code')),
+  qtype TEXT NOT NULL CHECK (qtype IN ('mcq', 'short', 'code', 'image_mcq', 'image_short')),
   prompt TEXT NOT NULL,
   options JSONB, -- For MCQ questions
   answer_key JSONB NOT NULL,
   hints TEXT[] DEFAULT '{}',
   explanation TEXT,
+  example TEXT, -- Example text (shown during question)
+  image_url TEXT, -- URL to image in Supabase Storage (for question images)
+  example_image_url TEXT, -- URL to image in Supabase Storage (for example images)
   enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

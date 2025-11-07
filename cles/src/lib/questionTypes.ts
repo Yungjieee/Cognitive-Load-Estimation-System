@@ -11,6 +11,7 @@ export interface BaseQuestion {
   prompt: string;
   hint?: string;
   example?: string;
+  example_image_url?: string;
   explanation?: string;
   hints?: string[];
   enabled: boolean;
@@ -70,8 +71,19 @@ export interface ShortAnswerQuestion extends BaseQuestion {
   };
 }
 
+// Image Short answer question
+export interface ImageShortQuestion extends BaseQuestion {
+  qtype: 'image_short';
+  media: {
+    imgUrl: string;
+  };
+  answer_key: {
+    regex: string;
+  };
+}
+
 // Union type for all question types
-export type Question = MCQQuestion | ImageMCQQuestion | MatchingQuestion | ReorderQuestion | ShortAnswerQuestion;
+export type Question = MCQQuestion | ImageMCQQuestion | MatchingQuestion | ReorderQuestion | ShortAnswerQuestion | ImageShortQuestion;
 
 // Answer submission types
 export interface MCQAnswer {
@@ -136,6 +148,11 @@ export function validateShortAnswer(question: ShortAnswerQuestion, answer: Short
   return regex.test(answer.text.trim());
 }
 
+export function validateImageShort(question: ImageShortQuestion, answer: ShortAnswer): boolean {
+  const regex = new RegExp(question.answer_key.regex, 'i'); // case insensitive
+  return regex.test(answer.text.trim());
+}
+
 // Main validation function
 export function validateAnswer(question: Question, answer: Answer): boolean {
   switch (question.qtype) {
@@ -149,6 +166,8 @@ export function validateAnswer(question: Question, answer: Answer): boolean {
       return validateReorder(question as ReorderQuestion, answer as ReorderAnswer);
     case QUESTION_TYPES.SHORT:
       return validateShortAnswer(question as ShortAnswerQuestion, answer as ShortAnswer);
+    case QUESTION_TYPES.IMAGE_SHORT:
+      return validateImageShort(question as ImageShortQuestion, answer as ShortAnswer);
     default:
       return false;
   }
@@ -174,8 +193,9 @@ export function getCorrectAnswer(question: Question): string {
       return reorderQuestion.answer_key.order.join(' → ');
     
     case QUESTION_TYPES.SHORT:
+    case QUESTION_TYPES.IMAGE_SHORT:
       return 'See explanation below';
-    
+
     default:
       return 'Unknown';
   }

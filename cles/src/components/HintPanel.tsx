@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Question } from "@/lib/questionTypes";
 import { PENALTY_HINT_PER_USE } from "@/lib/config";
+import ImageLightbox from "./ImageLightbox";
 
 interface HintPanelProps {
   question: Question;
@@ -21,6 +22,7 @@ export default function HintPanel({
   const [showHint2, setShowHint2] = useState(false);
   const [showHint3, setShowHint3] = useState(false);
   const [showExample, setShowExample] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
 
   // Reset hint UI state when question changes
   useEffect(() => {
@@ -193,10 +195,33 @@ export default function HintPanel({
           </button>
           
           {showExample && (
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <p className="text-sm text-green-800 dark:text-green-200">
-                {question.example || "No example available for this question."}
-              </p>
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-3">
+              {question.example && (
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  {question.example}
+                </p>
+              )}
+              {(question as any).example_image_url && (
+                <div className="relative group">
+                  <img
+                    src={(question as any).example_image_url}
+                    alt="Example visualization"
+                    className="max-w-full h-auto rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setLightboxImage((question as any).example_image_url)}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 transition-opacity">
+                    Click to zoom
+                  </div>
+                </div>
+              )}
+              {!question.example && !(question as any).example_image_url && (
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  No example available for this question.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -219,6 +244,15 @@ export default function HintPanel({
           </div>
         </div>
       </div>
+
+      {/* Lightbox Modal */}
+      {lightboxImage && (
+        <ImageLightbox
+          src={lightboxImage}
+          alt="Example visualization"
+          onClose={() => setLightboxImage(null)}
+        />
+      )}
     </div>
   );
 }

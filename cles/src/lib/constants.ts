@@ -58,7 +58,8 @@ export const QUESTION_TYPES = {
   IMAGE_MCQ: 'image_mcq',
   MATCHING: 'matching',
   REORDER: 'reorder',
-  SHORT: 'short'
+  SHORT: 'short',
+  IMAGE_SHORT: 'image_short'
 } as const;
 
 // Event types for logging

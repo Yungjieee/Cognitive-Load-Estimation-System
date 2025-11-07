@@ -29,12 +29,15 @@ export interface Question {
   id: number
   subtopic_id: number
   difficulty: 'E' | 'M' | 'H'
-  qtype: 'mcq' | 'short' | 'code'
+  qtype: 'mcq' | 'short' | 'code' | 'image_mcq' | 'image_short'
   prompt: string
   options: any[] | null
   answer_key: any
   hints: string[]
   explanation: string | null
+  example: string | null
+  image_url: string | null
+  example_image_url: string | null
   enabled: boolean
   created_at: string
   updated_at: string
