@@ -181,7 +181,7 @@ export function getCorrectAnswer(question: Question): string {
       const mcqQuestion = question as MCQQuestion | ImageMCQQuestion;
       const correctOption = mcqQuestion.options.find(opt => opt.key === mcqQuestion.answer_key.correct);
       return correctOption ? `${correctOption.key}: ${correctOption.text}` : 'Unknown';
-    
+
     case QUESTION_TYPES.MATCHING:
       const matchingQuestion = question as MatchingQuestion;
       return Object.entries(matchingQuestion.answer_key.map)
