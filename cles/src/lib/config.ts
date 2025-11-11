@@ -41,6 +41,16 @@ export const ENCOURAGEMENT_MESSAGES = {
   ]
 } as const;
 
+// Question types
+export const QUESTION_TYPES = {
+  MCQ: 'mcq',
+  IMAGE_MCQ: 'image_mcq',
+  MATCHING: 'matching',
+  REORDER: 'reorder',
+  SHORT: 'short',
+  IMAGE_SHORT: 'image_short'
+} as const;
+
 // Event types for logging
 export const EVENT_TYPES = {
   STRESSOR_SHOW: 'stressor_show',

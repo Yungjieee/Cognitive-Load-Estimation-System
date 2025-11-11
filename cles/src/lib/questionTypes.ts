@@ -1,6 +1,6 @@
 // Question types and validation system for CLES sessions
 
-import { QUESTION_TYPES } from './constants';
+import { QUESTION_TYPES } from './config';
 
 // Base question interface
 export interface BaseQuestion {

@@ -81,10 +81,7 @@ export default function CalibrationPage() {
   useEffect(() => {
     const initializeStreams = async () => {
       try {
-        // Start WebSocket and MQTT services
-        await fetch('/api/services/start', { method: 'POST' });
-        console.log('✅ Services started');
-        
+        // Services auto-start via instrumentation.ts
         await liveStreamsManager.initialize();
         setStreamStatus(liveStreamsManager.getStatus());
         
@@ -373,19 +370,6 @@ export default function CalibrationPage() {
     }
   };
 
-  // Manual start services function
-  const startServices = async () => {
-    try {
-      const response = await fetch('/api/services/start', { method: 'POST' });
-      const data = await response.json();
-      console.log('🚀 Services start result:', data);
-      alert(`Services Start:\nSuccess: ${data.success}\nMessage: ${data.message}\nWebSocket: ${data.websocket?.running ? 'Running' : 'Not Running'}`);
-    } catch (error) {
-      console.error('Failed to start services:', error);
-      alert('Failed to start services');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="mx-auto max-w-6xl px-4 py-10">
@@ -571,12 +555,6 @@ export default function CalibrationPage() {
               className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
             >
               🔍 Check Services Status
-            </button>
-            <button
-              onClick={startServices}
-              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
-            >
-              🚀 Start Services
             </button>
           </div>
           

@@ -1,7 +1,7 @@
 // Event logging system for CLES sessions
 // Tracks all user interactions and system events for analytics
 
-import { EVENT_TYPES } from './constants';
+import { EVENT_TYPES } from './config';
 
 export interface SessionEvent {
   id: string;
