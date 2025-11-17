@@ -9,8 +9,8 @@ export const SCHEDULE = [
   { idx: 5,  level: 'hard',   limit: 60, points: 2.5 },
 ] as const;
 
-export const PENALTY_HINT_PER_USE = 0.1;   // per hint (question-level)
-export const PENALTY_EXTRA_TIME_TOTAL = 0.1; // per question (total-level)
+export const PENALTY_HINT_PER_USE = 0.01;   // per hint (question-level)
+export const PENALTY_EXTRA_TIME_TOTAL = 0.01; // per question (total-level)
 export const EXTRA_TIME_FACTOR = 0.70;     // +70% of original limit
 export const REST_MIN_MS = 60_000;         // 60s (support only)
 export const REST_MAX_MS = 120_000;        // 120s (support only)
