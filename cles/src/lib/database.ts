@@ -13,6 +13,8 @@ export interface User {
   profile_experience_taken_course: 'yes' | 'no' | 'not_sure' | null
   profile_experience_hands_on: 'none' | 'some_exercises' | 'small_project' | 'large_project' | null
   profile_interest_subtopics: string[]
+  profile_math_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken' | null
+  profile_programming_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken' | null
   settings_mode: 'support' | 'no_support'
 }
 
@@ -55,6 +57,7 @@ export interface Session {
   rmssd_baseline?: number
   rmssd_confidence?: 'ok' | 'low'
   baseline_beat_count?: number
+  environment_noise?: number
   created_at: string
   subtopics?: {
     key: string
@@ -80,6 +83,15 @@ export interface Response {
     intrinsic?: number
     extraneous?: number
     germane?: number
+    rmssd_q?: number
+    rmssd_base?: number
+    hrv_confidence?: 'ok' | 'low'
+    hintPenalty?: number
+    examplePenalty?: number
+    extraTimePenalty?: number
+    totalPenalty?: number
+    pointsAwarded?: number
+    skipped?: boolean
   }
   created_at: string
 }
@@ -103,16 +115,47 @@ export interface HRBeat {
   created_at: string
 }
 
-export interface NASATLXBlock {
+// NASA-TLX System (per-question calculations)
+export interface NasaTlxSystem {
   id: number
   session_id: number
-  block: 'easy' | 'medium' | 'hard'
-  mental: number | null
-  physical: number | null
-  temporal: number | null
-  performance: number | null
-  effort: number | null
-  frustration: number | null
+  question_id: number
+  q_index: number
+  mental_demand: number
+  physical_demand: number
+  temporal_demand: number
+  performance: number
+  effort: number
+  frustration: number
+  cognitive_load: number
+  created_at: string
+}
+
+// NASA-TLX User (subjective survey)
+export interface NasaTlxUser {
+  id: number
+  session_id: number
+  mental_demand: number
+  physical_demand: number
+  temporal_demand: number
+  performance: number
+  effort: number
+  frustration: number
+  cognitive_load: number
+  created_at: string
+}
+
+// Cognitive Load Summary (weighted aggregates)
+export interface CognitiveLoadSummary {
+  id: number
+  session_id: number
+  sys_mental_demand: number
+  sys_physical_demand: number
+  sys_temporal_demand: number
+  sys_performance: number
+  sys_effort: number
+  sys_frustration: number
+  sys_cognitive_load: number
   created_at: string
 }
 
@@ -276,6 +319,8 @@ export class DatabaseClient {
     profile_prior_knowledge?: Record<string, string>
     profile_experience_taken_course?: 'yes' | 'no' | 'not_sure'
     profile_experience_hands_on?: 'none' | 'some_exercises' | 'small_project' | 'large_project'
+    profile_math_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken'
+    profile_programming_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken'
     profile_interest_subtopics?: string[]
   }): Promise<User> {
     const { data, error } = await supabase
@@ -326,6 +371,17 @@ export class DatabaseClient {
       .from('subtopics')
       .select('*')
       .eq('key', subtopicKey)
+      .single()
+
+    if (error && error.code !== 'PGRST116') throw error
+    return data
+  }
+
+  static async getSubtopicById(subtopicId: number | string): Promise<Subtopic | null> {
+    const { data, error } = await supabase
+      .from('subtopics')
+      .select('*')
+      .eq('id', Number(subtopicId))
       .single()
 
     if (error && error.code !== 'PGRST116') throw error
@@ -417,6 +473,7 @@ export class DatabaseClient {
     rmssd_confidence?: 'ok' | 'low'
     baseline_beat_count?: number
     current_question?: number
+    environment_noise?: number
   }): Promise<Session> {
     const { data, error } = await supabase
       .from('sessions')
@@ -494,6 +551,25 @@ export class DatabaseClient {
       .order('q_index')
 
     if (error) throw error
+    return data
+  }
+
+  static async getResponseBySessionAndIndex(
+    sessionId: number,
+    qIndex: number
+  ): Promise<Response | null> {
+    const { data, error } = await supabase
+      .from('responses')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('q_index', qIndex)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // No rows found
+      throw error
+    }
+
     return data
   }
 
@@ -632,38 +708,6 @@ export class DatabaseClient {
     return data
   }
 
-  // NASA-TLX operations
-  static async createNASATLXBlock(blockData: {
-    session_id: string
-    block: 'easy' | 'medium' | 'hard'
-    mental?: number
-    physical?: number
-    temporal?: number
-    performance?: number
-    effort?: number
-    frustration?: number
-  }): Promise<NASATLXBlock> {
-    const { data, error } = await supabase
-      .from('nasa_tlx_blocks')
-      .insert([blockData])
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async getSessionNASATLXBlocks(sessionId: string): Promise<NASATLXBlock[]> {
-    const { data, error } = await supabase
-      .from('nasa_tlx_blocks')
-      .select('*')
-      .eq('session_id', Number(sessionId))
-      .order('created_at')
-
-    if (error) throw error
-    return data
-  }
-
   // HRV-related methods
   static async updateResponseHRVMetrics(
     sessionId: number, 
@@ -733,6 +777,114 @@ export class DatabaseClient {
       event_type: event.etype,
       timestamp: event.ts_ms
     }))
+  }
+
+  // ============================================================================
+  // NASA-TLX Methods
+  // ============================================================================
+
+  // NASA-TLX System (per-question calculations)
+  static async createNasaTlxSystem(data: {
+    session_id: number
+    question_id: number
+    q_index: number
+    mental_demand: number
+    physical_demand: number
+    temporal_demand: number
+    performance: number
+    effort: number
+    frustration: number
+    cognitive_load: number
+  }): Promise<NasaTlxSystem> {
+    const { data: result, error } = await supabase
+      .from('nasa_tlx_system')
+      .insert([data])
+      .select()
+      .single()
+
+    if (error) throw error
+    return result
+  }
+
+  static async getSessionNasaTlxSystem(sessionId: string): Promise<NasaTlxSystem[]> {
+    const { data, error } = await supabase
+      .from('nasa_tlx_system')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+      .order('q_index')
+
+    if (error) throw error
+    return data
+  }
+
+  // NASA-TLX User (subjective survey)
+  static async createNasaTlxUser(data: {
+    session_id: number
+    mental_demand: number
+    physical_demand: number
+    temporal_demand: number
+    performance: number
+    effort: number
+    frustration: number
+    cognitive_load: number
+  }): Promise<NasaTlxUser> {
+    const { data: result, error } = await supabase
+      .from('nasa_tlx_user')
+      .insert([data])
+      .select()
+      .single()
+
+    if (error) throw error
+    return result
+  }
+
+  static async getSessionNasaTlxUser(sessionId: string): Promise<NasaTlxUser | null> {
+    const { data, error } = await supabase
+      .from('nasa_tlx_user')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // No rows found
+      throw error
+    }
+    return data
+  }
+
+  // Cognitive Load Summary (weighted aggregates)
+  static async createCognitiveLoadSummary(data: {
+    session_id: number
+    sys_mental_demand: number
+    sys_physical_demand: number
+    sys_temporal_demand: number
+    sys_performance: number
+    sys_effort: number
+    sys_frustration: number
+    sys_cognitive_load: number
+  }): Promise<CognitiveLoadSummary> {
+    const { data: result, error } = await supabase
+      .from('cognitive_load_summary')
+      .insert([data])
+      .select()
+      .single()
+
+    if (error) throw error
+    return result
+  }
+
+  static async getSessionCognitiveLoadSummary(sessionId: string): Promise<CognitiveLoadSummary | null> {
+    const { data, error } = await supabase
+      .from('cognitive_load_summary')
+      .select('*')
+      .eq('session_id', Number(sessionId))
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null // No rows found
+      throw error
+    }
+    return data
   }
 
   // Utility functions

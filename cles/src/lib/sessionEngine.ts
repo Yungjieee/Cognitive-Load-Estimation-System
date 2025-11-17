@@ -7,6 +7,14 @@ import { timerController } from './TimerController';
 import { eventLogger } from './eventLogger';
 import { liveStreamsManager } from './liveStreams';
 import { HRV_CONFIG } from './hrvConfig';
+import {
+  calculateMentalDemand,
+  calculatePhysicalDemand,
+  calculateTemporalDemand,
+  calculatePerformance,
+  calculateEffort,
+  calculateFrustration
+} from './nasaTlx';
 
 export interface SessionState {
   sessionId: string;
@@ -454,6 +462,164 @@ class SessionEngine {
     }
   }
 
+  // Calculate and save NASA-TLX dimensions for a question
+  private async calculateAndSaveNasaTLX(
+    questionIndex: number,      // 0-4 (internal index)
+    pointsAwarded: number,       // Already calculated
+    isCorrect: boolean,          // Already determined
+    timeMs: number,              // Already calculated
+    hintsUsed: number,           // From state
+    examplePenalty: number,      // Already calculated (0 or 0.01)
+    extraTimeUsed: boolean       // From state
+  ): Promise<void> {
+    if (!this.state) {
+      console.error('❌ No session state available for NASA-TLX calculation');
+      return;
+    }
+
+    const qIndex = questionIndex + 1; // Convert to 1-5
+    const sessionId = Number(this.state.sessionId);
+    const question = this.state.questions[questionIndex];
+
+    try {
+      console.log(`📊 Calculating NASA-TLX dimensions for Q${qIndex}...`);
+
+      // Step 1: Fetch required data from database
+      const { DatabaseClient } = await import('./database');
+
+      // Fetch session data
+      const session = await DatabaseClient.getSession(this.state.sessionId);
+      if (!session) {
+        console.error('❌ Session not found for NASA-TLX calculation');
+        return;
+      }
+
+      // Fetch user profile data
+      const user = await DatabaseClient.getUser(session.user_id);
+      if (!user) {
+        console.error('❌ User not found for NASA-TLX calculation');
+        return;
+      }
+
+      // Fetch response record (contains attention_rate, rmssd_q, rmssd_base)
+      const response = await DatabaseClient.getResponseBySessionAndIndex(sessionId, qIndex);
+      if (!response) {
+        console.error('❌ Response not found for NASA-TLX calculation');
+        return;
+      }
+
+      // Fetch subtopic to get the key for familiarity lookup
+      const subtopic = await DatabaseClient.getSubtopicById(session.subtopic_id);
+      const subtopicKey = subtopic?.key || 'unknown';
+
+      // Step 2: Extract data with defaults
+      // Mental Demand inputs
+      // Convert numeric difficulty (1, 3, 5) back to letter format ('E', 'M', 'H') for NASA-TLX
+      const difficultyNumeric = question.difficulty as number;
+      let difficulty: 'E' | 'M' | 'H';
+      if (difficultyNumeric === 1) {
+        difficulty = 'E';
+      } else if (difficultyNumeric === 5) {
+        difficulty = 'H';
+      } else {
+        difficulty = 'M'; // Default to Medium for 3 or any other value
+      }
+
+      const familiarity = user.profile_prior_knowledge?.[subtopicKey] || 'none';
+      const mathGrade = user.profile_math_grade || 'not_taken';
+      const programmingGrade = user.profile_programming_grade || 'not_taken';
+      const courseTaken = user.profile_experience_taken_course || 'not_sure';
+      const practiceLevel = user.profile_experience_hands_on || 'none';
+
+      // Physical Demand input
+      const environmentNoise = session.environment_noise || 10; // Default to neutral
+
+      // Effort inputs
+      const attentionRate = response.attention_rate || null; // Can be null, defaults to 50 in function
+
+      // Frustration inputs
+      const baselineRMSSD = response.metrics?.rmssd_base || session.rmssd_baseline || null;
+      const questionRMSSD = response.metrics?.rmssd_q || null;
+
+      // Step 3: Calculate all 6 dimensions
+      // 1. Mental Demand
+      const mentalDemand = calculateMentalDemand(
+        difficulty,
+        familiarity,
+        mathGrade,
+        programmingGrade,
+        courseTaken,
+        practiceLevel
+      );
+
+      // 2. Physical Demand
+      const physicalDemand = calculatePhysicalDemand(environmentNoise);
+
+      // 3. Temporal Demand
+      const temporalDemand = calculateTemporalDemand(timeMs, qIndex, extraTimeUsed);
+
+      // 4. Performance
+      const performance = calculatePerformance(qIndex, pointsAwarded);
+
+      // 5. Effort
+      const effort = calculateEffort(
+        timeMs,
+        qIndex,
+        extraTimeUsed,
+        hintsUsed,
+        examplePenalty,
+        attentionRate
+      );
+
+      // 6. Frustration
+      let frustration = 10.5; // Default to neutral
+      if (baselineRMSSD && questionRMSSD) {
+        frustration = calculateFrustration(baselineRMSSD, questionRMSSD);
+      } else {
+        console.warn(`⚠️ Missing RMSSD data for Q${qIndex}, using neutral frustration (10.5)`);
+      }
+
+      // Step 4: Calculate Cognitive Load (average of 6 dimensions)
+      const cognitiveLoad = (
+        mentalDemand +
+        physicalDemand +
+        temporalDemand +
+        performance +
+        effort +
+        frustration
+      ) / 6;
+
+      console.log(`✅ NASA-TLX calculated for Q${qIndex}:`, {
+        mentalDemand: mentalDemand.toFixed(2),
+        physicalDemand: physicalDemand.toFixed(2),
+        temporalDemand: temporalDemand.toFixed(2),
+        performance: performance.toFixed(2),
+        effort: effort.toFixed(2),
+        frustration: frustration.toFixed(2),
+        cognitiveLoad: cognitiveLoad.toFixed(2)
+      });
+
+      // Step 5: Save to database
+      await DatabaseClient.createNasaTlxSystem({
+        session_id: sessionId,
+        question_id: Number(question.id),
+        q_index: qIndex,
+        mental_demand: mentalDemand,
+        physical_demand: physicalDemand,
+        temporal_demand: temporalDemand,
+        performance: performance,
+        effort: effort,
+        frustration: frustration,
+        cognitive_load: cognitiveLoad
+      });
+
+      console.log(`💾 NASA-TLX data saved for Q${qIndex}`);
+    } catch (error) {
+      console.error(`❌ Failed to calculate/save NASA-TLX data for Q${qIndex}:`, error);
+      // Don't throw - allow session to continue even if NASA-TLX calculation fails
+    }
+  }
+
   // Calculate overall session attention rate
   private async calculateSessionAttentionRate(): Promise<void> {
     if (!this.state) return;
@@ -605,6 +771,17 @@ class SessionEngine {
 
     // Calculate attention rate for this question
     await this.calculateQuestionAttentionRate(questionIndex + 1);
+
+    // Calculate and save NASA-TLX dimensions
+    await this.calculateAndSaveNasaTLX(
+      questionIndex,
+      pointsAwarded,
+      isCorrect,
+      (config.limit - this.state.timeRemaining) * 1000,
+      this.state.hintsUsed[questionIndex],
+      examplePenalty,
+      this.state.extraTimeUsed[questionIndex]
+    );
 
     // Log answer submission
     this.logEvent(EVENT_TYPES.ANSWER_SUBMIT, {
@@ -794,6 +971,17 @@ class SessionEngine {
 
     // Calculate attention rate for this question (even if skipped)
     await this.calculateQuestionAttentionRate(questionIndex + 1);
+
+    // Calculate and save NASA-TLX dimensions (even for skipped questions)
+    await this.calculateAndSaveNasaTLX(
+      questionIndex,
+      0,
+      false,
+      (config.limit - this.state.timeRemaining) * 1000,
+      this.state.hintsUsed[questionIndex],
+      this.state.exampleUsed[questionIndex] ? PENALTY_HINT_PER_USE : 0,
+      this.state.extraTimeUsed[questionIndex]
+    );
 
     // Move to next question or end session
     this.nextQuestion();

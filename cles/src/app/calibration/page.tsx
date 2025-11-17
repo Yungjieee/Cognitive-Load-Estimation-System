@@ -28,7 +28,9 @@ export default function CalibrationPage() {
   const [dbSessionId, setDbSessionId] = useState<number | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [mode, setMode] = useState<'support' | 'no_support'>('support');
-  
+  const [showEnvironmentModal, setShowEnvironmentModal] = useState(false);
+  const [environmentNoise, setEnvironmentNoise] = useState(10); // Default to middle value
+
   // Sensor connection status
   const { sensorStatus, isConnected, isOnline, isChecking, hasError } = useSensorConnection();
   
@@ -235,6 +237,7 @@ export default function CalibrationPage() {
             console.log(`✅ RMSSD baseline calculated: ${data.rmssdBase.toFixed(2)}ms from ${data.beatCount} beats`);
             setRmssdBaseline(data.rmssdBase);
             setCalibrationPassed(true);
+            setShowEnvironmentModal(true); // Show environment modal immediately
             rmssdCalculatedRef.current = true; // Mark as calculated only on success
           } else {
             // Handle insufficient beats gracefully
@@ -355,6 +358,25 @@ export default function CalibrationPage() {
     }
     // Pass session ID to session page
     router.push(`/session?subtopic=${subtopicId}&sessionId=${dbSessionId}`);
+  }
+
+  async function handleEnvironmentSave() {
+    if (!dbSessionId) {
+      console.error('❌ No session ID to save environment noise');
+      return;
+    }
+
+    try {
+      console.log(`💾 Saving environment noise rating: ${environmentNoise} for session ${dbSessionId}`);
+      await DatabaseClient.updateSession(dbSessionId.toString(), {
+        environment_noise: environmentNoise
+      });
+      console.log('✅ Environment noise saved successfully');
+      setShowEnvironmentModal(false);
+    } catch (error) {
+      console.error('Failed to save environment noise:', error);
+      alert('Failed to save environment rating. Please try again.');
+    }
   }
 
   // Debug function to check services status
@@ -590,26 +612,79 @@ export default function CalibrationPage() {
               )}
             </button>
           ) : (
-            <div className="text-center space-y-6">
-              <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-green-200 dark:border-green-800 shadow-lg">
-                <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-green-600 dark:text-green-400 text-2xl">✓</span>
+            <>
+              {/* Environment Noise Modal */}
+              {showEnvironmentModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-purple-200 dark:border-purple-800">
+                    <div className="text-center mb-6">
+                      <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4">
+                        <span className="text-white text-2xl">🔊</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+                        Environment Assessment
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        How noisy or distracting is your current environment?
+                      </p>
+                    </div>
+
+                    <div className="mb-8">
+                      <div className="text-center mb-4">
+                        <span className="text-4xl font-bold gradient-text">
+                          {environmentNoise}
+                        </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ 21</span>
+                      </div>
+
+                      <input
+                        type="range"
+                        min="0"
+                        max="21"
+                        step="1"
+                        value={environmentNoise}
+                        onChange={(e) => setEnvironmentNoise(Number(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-purple-600"
+                      />
+
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        <span>0 = Very Quiet</span>
+                        <span>21 = Very Noisy</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleEnvironmentSave}
+                      className="w-full rounded-xl px-6 py-3 btn-primary text-white font-semibold transition-all duration-300"
+                    >
+                      OK
+                    </button>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Calibration Complete!</h3>
-                <p className="text-green-700 dark:text-green-300 text-sm mb-2">Your devices are ready for monitoring</p>
-                {rmssdBaseline && (
-                  <p className="text-green-600 dark:text-green-400 text-xs">
-                    RMSSD Baseline: {rmssdBaseline.toFixed(1)}ms
-                  </p>
-                )}
+              )}
+
+              {/* Calibration Complete Screen (shown after modal closes) */}
+              <div className="text-center space-y-6">
+                <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-green-200 dark:border-green-800 shadow-lg">
+                  <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-green-600 dark:text-green-400 text-2xl">✓</span>
+                  </div>
+                  <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Calibration Complete!</h3>
+                  <p className="text-green-700 dark:text-green-300 text-sm mb-2">Your devices are ready for monitoring</p>
+                  {rmssdBaseline && (
+                    <p className="text-green-600 dark:text-green-400 text-xs">
+                      RMSSD Baseline: {rmssdBaseline.toFixed(1)}ms
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={startTask}
+                  className="rounded-xl px-8 py-4 btn-primary text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  Start Task
+                </button>
               </div>
-              <button
-                onClick={startTask}
-                className="rounded-xl px-8 py-4 btn-primary text-white font-semibold text-lg shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                Start Task
-              </button>
-            </div>
+            </>
           )}
         </div>
       </div>

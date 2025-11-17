@@ -17,7 +17,9 @@ CREATE TABLE public.users (
   profile_experience_taken_course TEXT CHECK (profile_experience_taken_course IN ('yes', 'no', 'not_sure')),
   profile_experience_hands_on TEXT CHECK (profile_experience_hands_on IN ('none', 'some_exercises', 'small_project', 'large_project')),
   profile_interest_subtopics TEXT[] DEFAULT '{}',
-  
+  profile_math_grade VARCHAR(20), -- A, B, C, D, F, or not_taken
+  profile_programming_grade VARCHAR(20), -- A, B, C, D, F, or not_taken
+
   -- Settings
   settings_mode TEXT DEFAULT 'support' CHECK (settings_mode IN ('support', 'no_support'))
 );
@@ -66,6 +68,9 @@ CREATE TABLE public.sessions (
   rmssd_baseline DECIMAL(8,2), -- RMSSD baseline from calibration (milliseconds)
   rmssd_confidence TEXT CHECK (rmssd_confidence IN ('ok', 'low')), -- Confidence in baseline quality
   baseline_beat_count INTEGER, -- Number of beats used for baseline calculation
+
+  -- NASA-TLX Physical Demand input
+  environment_noise DECIMAL(5,2), -- Environmental noise/distraction rating (0-21 scale) collected after calibration
 
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -117,17 +122,48 @@ CREATE TABLE public.attention_events (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- NASA-TLX blocks table
-CREATE TABLE public.nasa_tlx_blocks (
+-- NASA-TLX System (per-question calculations)
+CREATE TABLE public.nasa_tlx_system (
   id BIGSERIAL PRIMARY KEY,
   session_id BIGINT REFERENCES public.sessions(id) ON DELETE CASCADE,
-  block TEXT NOT NULL CHECK (block IN ('easy', 'medium', 'hard')), -- After Q1, Q3, Q5
-  mental INTEGER CHECK (mental >= 0 AND mental <= 100),
-  physical INTEGER CHECK (physical >= 0 AND physical <= 100),
-  temporal INTEGER CHECK (temporal >= 0 AND temporal <= 100),
-  performance INTEGER CHECK (performance >= 0 AND performance <= 100),
-  effort INTEGER CHECK (effort >= 0 AND effort <= 100),
-  frustration INTEGER CHECK (frustration >= 0 AND frustration <= 100),
+  question_id BIGINT REFERENCES public.questions(id) ON DELETE CASCADE,
+  q_index INTEGER NOT NULL CHECK (q_index >= 1 AND q_index <= 5),
+  mental_demand DECIMAL(5,2) NOT NULL CHECK (mental_demand >= 0 AND mental_demand <= 21),
+  physical_demand DECIMAL(5,2) NOT NULL CHECK (physical_demand >= 0 AND physical_demand <= 21),
+  temporal_demand DECIMAL(5,2) NOT NULL CHECK (temporal_demand >= 0 AND temporal_demand <= 21),
+  performance DECIMAL(5,2) NOT NULL CHECK (performance >= 0 AND performance <= 21),
+  effort DECIMAL(5,2) NOT NULL CHECK (effort >= 0 AND effort <= 21),
+  frustration DECIMAL(5,2) NOT NULL CHECK (frustration >= 0 AND frustration <= 21),
+  cognitive_load DECIMAL(5,2) NOT NULL CHECK (cognitive_load >= 0 AND cognitive_load <= 21),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(session_id, q_index)
+);
+
+-- NASA-TLX User (subjective survey)
+CREATE TABLE public.nasa_tlx_user (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT REFERENCES public.sessions(id) ON DELETE CASCADE UNIQUE,
+  mental_demand DECIMAL(5,2) NOT NULL CHECK (mental_demand >= 0 AND mental_demand <= 21),
+  physical_demand DECIMAL(5,2) NOT NULL CHECK (physical_demand >= 0 AND physical_demand <= 21),
+  temporal_demand DECIMAL(5,2) NOT NULL CHECK (temporal_demand >= 0 AND temporal_demand <= 21),
+  performance DECIMAL(5,2) NOT NULL CHECK (performance >= 0 AND performance <= 21),
+  effort DECIMAL(5,2) NOT NULL CHECK (effort >= 0 AND effort <= 21),
+  frustration DECIMAL(5,2) NOT NULL CHECK (frustration >= 0 AND frustration <= 21),
+  cognitive_load DECIMAL(5,2) NOT NULL CHECK (cognitive_load >= 0 AND cognitive_load <= 21),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Cognitive Load Summary (weighted aggregates)
+CREATE TABLE public.cognitive_load_summary (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT REFERENCES public.sessions(id) ON DELETE CASCADE UNIQUE,
+  sys_mental_demand DECIMAL(5,2) NOT NULL CHECK (sys_mental_demand >= 0 AND sys_mental_demand <= 21),
+  sys_physical_demand DECIMAL(5,2) NOT NULL CHECK (sys_physical_demand >= 0 AND sys_physical_demand <= 21),
+  sys_temporal_demand DECIMAL(5,2) NOT NULL CHECK (sys_temporal_demand >= 0 AND sys_temporal_demand <= 21),
+  sys_performance DECIMAL(5,2) NOT NULL CHECK (sys_performance >= 0 AND sys_performance <= 21),
+  sys_effort DECIMAL(5,2) NOT NULL CHECK (sys_effort >= 0 AND sys_effort <= 21),
+  sys_frustration DECIMAL(5,2) NOT NULL CHECK (sys_frustration >= 0 AND sys_frustration <= 21),
+  sys_cognitive_load DECIMAL(5,2) NOT NULL CHECK (sys_cognitive_load >= 0 AND sys_cognitive_load <= 21),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -147,7 +183,10 @@ CREATE INDEX idx_hr_beats_session_q_label ON public.hr_beats(session_id, q_label
 CREATE INDEX idx_attention_events_session_id ON public.attention_events(session_id);
 CREATE INDEX idx_attention_events_session_q_label ON public.attention_events(session_id, q_label);
 CREATE INDEX idx_attention_events_timestamp ON public.attention_events(timestamp);
-CREATE INDEX idx_nasa_tlx_blocks_session_id ON public.nasa_tlx_blocks(session_id);
+CREATE INDEX idx_nasa_tlx_system_session ON public.nasa_tlx_system(session_id);
+CREATE INDEX idx_nasa_tlx_system_question ON public.nasa_tlx_system(q_index);
+CREATE INDEX idx_nasa_tlx_user_session ON public.nasa_tlx_user(session_id);
+CREATE INDEX idx_cognitive_load_summary_session ON public.cognitive_load_summary(session_id);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -156,7 +195,9 @@ ALTER TABLE public.responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.hr_beats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attention_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.nasa_tlx_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nasa_tlx_system ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nasa_tlx_user ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cognitive_load_summary ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own data
 CREATE POLICY "Users can view own profile" ON public.users
@@ -198,10 +239,22 @@ CREATE POLICY "Users can view own attention_events" ON public.attention_events
 CREATE POLICY "Users can create own attention_events" ON public.attention_events
   FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
-CREATE POLICY "Users can view own nasa_tlx_blocks" ON public.nasa_tlx_blocks
+CREATE POLICY "Users can view own nasa_tlx_system" ON public.nasa_tlx_system
   FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
-CREATE POLICY "Users can create own nasa_tlx_blocks" ON public.nasa_tlx_blocks
+CREATE POLICY "Users can create own nasa_tlx_system" ON public.nasa_tlx_system
+  FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can view own nasa_tlx_user" ON public.nasa_tlx_user
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can create own nasa_tlx_user" ON public.nasa_tlx_user
+  FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can view own cognitive_load_summary" ON public.cognitive_load_summary
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can create own cognitive_load_summary" ON public.cognitive_load_summary
   FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
 -- Public read access for subtopics and questions
@@ -236,6 +289,12 @@ CREATE POLICY "Service role can manage all hr_beats" ON public.hr_beats
 CREATE POLICY "Service role can manage all attention_events" ON public.attention_events
   FOR ALL USING (auth.role() = 'service_role');
 
-CREATE POLICY "Service role can manage all nasa_tlx_blocks" ON public.nasa_tlx_blocks
+CREATE POLICY "Service role can manage all nasa_tlx_system" ON public.nasa_tlx_system
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role can manage all nasa_tlx_user" ON public.nasa_tlx_user
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role can manage all cognitive_load_summary" ON public.cognitive_load_summary
   FOR ALL USING (auth.role() = 'service_role');
 

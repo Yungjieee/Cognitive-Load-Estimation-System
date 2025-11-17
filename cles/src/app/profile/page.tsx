@@ -39,6 +39,15 @@ const HANDS_ON_OPTIONS = [
   { value: "large_project", label: "Large Project" }
 ];
 
+const GRADE_OPTIONS = [
+  { value: "A", label: "A" },
+  { value: "B", label: "B" },
+  { value: "C", label: "C" },
+  { value: "D", label: "D" },
+  { value: "F", label: "F" },
+  { value: "not_taken", label: "I didn't take this course" }
+];
+
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +57,8 @@ export default function ProfilePage() {
   const [priorKnowledge, setPriorKnowledge] = useState<Record<string, string>>({});
   const [takenCourse, setTakenCourse] = useState("");
   const [handsOn, setHandsOn] = useState("");
+  const [mathGrade, setMathGrade] = useState("");
+  const [programmingGrade, setProgrammingGrade] = useState("");
   const [interests, setInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -70,6 +81,8 @@ export default function ProfilePage() {
             setPriorKnowledge(userProfile.profile_prior_knowledge || {});
             setTakenCourse(userProfile.profile_experience_taken_course || "");
             setHandsOn(userProfile.profile_experience_hands_on || "");
+            setMathGrade(userProfile.profile_math_grade || "");
+            setProgrammingGrade(userProfile.profile_programming_grade || "");
             setInterests(userProfile.profile_interest_subtopics || []);
           }
         }
@@ -89,17 +102,20 @@ export default function ProfilePage() {
 
   function isFormValid(): boolean {
     // Check all 6 subtopics have prior knowledge selected
-    const allSubtopicsHaveKnowledge = SUBTOPICS.every(subtopic => 
+    const allSubtopicsHaveKnowledge = SUBTOPICS.every(subtopic =>
       priorKnowledge[subtopic] && priorKnowledge[subtopic] !== ""
     );
-    
+
     // Check experience fields are selected
     const experienceComplete = takenCourse !== "" && handsOn !== "";
-    
+
+    // Check grades are selected
+    const gradesComplete = mathGrade !== "" && programmingGrade !== "";
+
     // Check at least one interest is selected
     const interestsComplete = interests.length >= 1;
-    
-    return allSubtopicsHaveKnowledge && experienceComplete && interestsComplete;
+
+    return allSubtopicsHaveKnowledge && experienceComplete && gradesComplete && interestsComplete;
   }
 
   async function handleSave() {
@@ -113,6 +129,8 @@ export default function ProfilePage() {
         profile_prior_knowledge: priorKnowledge,
         profile_experience_taken_course: takenCourse as 'yes' | 'no' | 'not_sure',
         profile_experience_hands_on: handsOn as 'none' | 'some_exercises' | 'small_project' | 'large_project',
+        profile_math_grade: mathGrade as 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken',
+        profile_programming_grade: programmingGrade as 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken',
         profile_interest_subtopics: interests,
       });
       
@@ -134,6 +152,7 @@ export default function ProfilePage() {
   const completedSections = [
     SUBTOPICS.every(subtopic => priorKnowledge[subtopic] && priorKnowledge[subtopic] !== ""),
     takenCourse !== "" && handsOn !== "",
+    mathGrade !== "" && programmingGrade !== "",
     interests.length >= 1,
   ].filter(Boolean).length;
 
@@ -158,12 +177,12 @@ export default function ProfilePage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progress</span>
-              <span className="text-sm font-bold gradient-text">Profile {completedSections}/3 → 3/3 complete</span>
+              <span className="text-sm font-bold gradient-text">Profile {completedSections}/4 → 4/4 complete</span>
             </div>
             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-              <div 
+              <div
                 className="gradient-bg h-3 rounded-full transition-all duration-500"
-                style={{ width: `${(completedSections / 3) * 100}%` }}
+                style={{ width: `${(completedSections / 4) * 100}%` }}
               />
             </div>
           </div>
@@ -259,6 +278,66 @@ export default function ProfilePage() {
                       }`}
                     >
                       {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Grades Section */}
+          <section className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">🎓</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Academic Grades</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300">What grades did you receive?</p>
+              </div>
+            </div>
+            <div className="space-y-6">
+              {/* Math Grade */}
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-5">
+                <label className="text-base font-semibold text-gray-900 dark:text-white mb-4 block">
+                  Math Course Grade
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {GRADE_OPTIONS.map((grade) => (
+                    <button
+                      key={grade.value}
+                      type="button"
+                      onClick={() => setMathGrade(grade.value)}
+                      className={`rounded-lg px-4 py-2.5 text-sm font-medium border-2 transition-all duration-200 ${
+                        mathGrade === grade.value
+                          ? "border-purple-500 bg-purple-500 text-white shadow-md"
+                          : "border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      }`}
+                    >
+                      {grade.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Programming Grade */}
+              <div className="bg-gray-50 dark:bg-gray-700/30 rounded-xl p-5">
+                <label className="text-base font-semibold text-gray-900 dark:text-white mb-4 block">
+                  Programming Course Grade
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {GRADE_OPTIONS.map((grade) => (
+                    <button
+                      key={grade.value}
+                      type="button"
+                      onClick={() => setProgrammingGrade(grade.value)}
+                      className={`rounded-lg px-4 py-2.5 text-sm font-medium border-2 transition-all duration-200 ${
+                        programmingGrade === grade.value
+                          ? "border-purple-500 bg-purple-500 text-white shadow-md"
+                          : "border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                      }`}
+                    >
+                      {grade.label}
                     </button>
                   ))}
                 </div>
