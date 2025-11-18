@@ -98,7 +98,7 @@ export default function SessionPage() {
         // Stop all streams
         liveStreamsManager.cleanup();
 
-        router.push(`/reports/${sessionState.sessionId}`);
+        router.push(`/survey/${sessionState.sessionId}`);
       })();
     }
   }, [sessionState?.isCompleted, router, dbSessionId, stopSession]);

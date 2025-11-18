@@ -248,3 +248,101 @@ export function calculateFrustration(
     return Math.min(21, frustration)
   }
 }
+
+/**
+ * Calculate User Cognitive Load from survey ratings
+ *
+ * User Cognitive Load = Average of 6 NASA-TLX dimensions
+ *
+ * @param ratings - User's ratings for all 6 NASA-TLX dimensions
+ * @returns Cognitive load score (0-21)
+ */
+export function calculateUserCognitiveLoad(ratings: {
+  mental_demand: number
+  physical_demand: number
+  temporal_demand: number
+  performance: number
+  effort: number
+  frustration: number
+}): number {
+  return (
+    ratings.mental_demand +
+    ratings.physical_demand +
+    ratings.temporal_demand +
+    ratings.performance +
+    ratings.effort +
+    ratings.frustration
+  ) / 6
+}
+
+/**
+ * Calculate System Cognitive Load Summary from per-question NASA-TLX records
+ *
+ * Uses weighted sums based on question difficulty:
+ * - Easy ('E') = 0.1 weight
+ * - Medium ('M') = 0.2 weight
+ * - Hard ('H') = 0.25 weight
+ *
+ * @param systemRecords - Array of nasa_tlx_system records with question difficulty
+ * @returns Object with weighted sums for all 6 dimensions + cognitive load
+ */
+export function calculateSystemCognitiveLoadSummary(
+  systemRecords: Array<{
+    mental_demand: number
+    physical_demand: number
+    temporal_demand: number
+    performance: number
+    effort: number
+    frustration: number
+    question: { difficulty: 'E' | 'M' | 'H' }
+  }>
+): {
+  sys_mental_demand: number
+  sys_physical_demand: number
+  sys_temporal_demand: number
+  sys_performance: number
+  sys_effort: number
+  sys_frustration: number
+  sys_cognitive_load: number
+} {
+  // Map difficulty directly from letter to weight
+  function getWeight(difficulty: 'E' | 'M' | 'H'): number {
+    if (difficulty === 'E') return 0.1   // Easy
+    if (difficulty === 'H') return 0.25  // Hard
+    return 0.2                           // Medium (default)
+  }
+
+  // Calculate weighted sums for all 6 dimensions
+  let mentalSum = 0, physicalSum = 0, temporalSum = 0
+  let performanceSum = 0, effortSum = 0, frustrationSum = 0
+
+  systemRecords.forEach((record) => {
+    const weight = getWeight(record.question.difficulty)
+    mentalSum += record.mental_demand * weight
+    physicalSum += record.physical_demand * weight
+    temporalSum += record.temporal_demand * weight
+    performanceSum += record.performance * weight
+    effortSum += record.effort * weight
+    frustrationSum += record.frustration * weight
+  })
+
+  // Calculate overall cognitive load as average of 6 dimension sums
+  const cognitiveLoad = (
+    mentalSum +
+    physicalSum +
+    temporalSum +
+    performanceSum +
+    effortSum +
+    frustrationSum
+  ) / 6
+
+  return {
+    sys_mental_demand: mentalSum,
+    sys_physical_demand: physicalSum,
+    sys_temporal_demand: temporalSum,
+    sys_performance: performanceSum,
+    sys_effort: effortSum,
+    sys_frustration: frustrationSum,
+    sys_cognitive_load: cognitiveLoad
+  }
+}

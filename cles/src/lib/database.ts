@@ -817,6 +817,34 @@ export class DatabaseClient {
     return data
   }
 
+  static async getSessionNasaTlxSystemWithQuestions(
+    sessionId: string
+  ): Promise<Array<NasaTlxSystem & { question: { difficulty: 'E' | 'M' | 'H' } }>> {
+    const { data, error } = await supabase
+      .from('nasa_tlx_system')
+      .select(`
+        *,
+        questions:question_id (
+          difficulty
+        )
+      `)
+      .eq('session_id', Number(sessionId))
+      .order('q_index')
+
+    if (error) throw error
+
+    // Transform data: rename 'questions' to 'question'
+    const transformedData = data?.map(record => {
+      const { questions, ...rest } = record as any
+      return {
+        ...rest,
+        question: questions // Rename questions → question
+      }
+    }) || []
+
+    return transformedData as Array<NasaTlxSystem & { question: { difficulty: 'E' | 'M' | 'H' } }>
+  }
+
   // NASA-TLX User (subjective survey)
   static async createNasaTlxUser(data: {
     session_id: number

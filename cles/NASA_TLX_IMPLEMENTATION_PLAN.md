@@ -1274,8 +1274,18 @@ Show comparison:
 10. ✅ Implement calibration page environment modal
 11. ✅ Create nasaTlx.ts utility functions
 12. ✅ Integrate calculations into question end handlers
-13. ⏳ Create NASA-TLX user survey page (NEXT)
-14. ⏳ Update report page with comparisons
+13. ✅ Create NASA-TLX user survey page
+    - Created `/survey/[id]` page with 6 sliders (0-21 scale)
+    - Simplified English descriptions for better user understanding
+    - Added scale markers (0, 5, 10, 15, 21) for precision
+    - Progress indicator showing completion percentage
+    - Visual feedback with purple borders when touched
+    - Added clarification for Performance scale (0 = perfect, 21 = failure)
+    - Calculates and saves user cognitive load
+    - Calculates and saves system cognitive load summary with weighted averages
+    - Fixed data transformation for Supabase join query (questions → question)
+    - Redirects to report page after submission
+14. ⏳ Update report page with comparisons (NEXT)
 15. ⏳ Validate and correlate system predictions vs subjective ratings
 
 ---
