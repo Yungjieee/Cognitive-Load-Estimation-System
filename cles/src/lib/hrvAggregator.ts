@@ -12,7 +12,6 @@ export interface HRVAggregator {
   sessionId: number;
   baselineRMSSD: number | null;
   baselineConfidence: HRVConfidence;
-  questionBoundaries: Map<number, { start: number; end: number }>;
 }
 
 /**
@@ -128,86 +127,3 @@ export function computeQuestionHRV(
   };
 }
 
-/**
- * Creates a new HRV aggregator for a session
- */
-export function createHRVAggregator(sessionId: number): HRVAggregator {
-  return {
-    sessionId,
-    baselineRMSSD: null,
-    baselineConfidence: 'low',
-    questionBoundaries: new Map()
-  };
-}
-
-/**
- * Adds question boundary to aggregator
- */
-export function addQuestionBoundary(
-  aggregator: HRVAggregator,
-  qIndex: number,
-  timestamp: number,
-  eventType: 'question_start' | 'question_end'
-): void {
-  if (!aggregator.questionBoundaries.has(qIndex)) {
-    aggregator.questionBoundaries.set(qIndex, { start: 0, end: 0 });
-  }
-  
-  const boundary = aggregator.questionBoundaries.get(qIndex)!;
-  
-  if (eventType === 'question_start') {
-    boundary.start = timestamp;
-  } else {
-    boundary.end = timestamp;
-  }
-}
-
-/**
- * Processes all HRV metrics for a completed session
- */
-export function processSessionHRV(
-  aggregator: HRVAggregator,
-  allIBIs: ProcessedIBI[]
-): Map<number, HRVMetrics> {
-  const results = new Map<number, HRVMetrics>();
-  
-  if (!aggregator.baselineRMSSD || aggregator.baselineRMSSD === 0) {
-    // No baseline available, mark all questions as low confidence
-    for (let qIndex = 1; qIndex <= 5; qIndex++) {
-      results.set(qIndex, {
-        hrv: 'low',
-        rmssd_q: 0,
-        rmssd_base: 0,
-        hrv_confidence: 'low'
-      });
-    }
-    return results;
-  }
-  
-  // Process each question
-  for (let qIndex = 1; qIndex <= 5; qIndex++) {
-    const boundary = aggregator.questionBoundaries.get(qIndex);
-    
-    if (!boundary || boundary.start === 0 || boundary.end === 0) {
-      // Missing boundary data
-      results.set(qIndex, {
-        hrv: 'low',
-        rmssd_q: 0,
-        rmssd_base: aggregator.baselineRMSSD,
-        hrv_confidence: 'low'
-      });
-      continue;
-    }
-    
-    const metrics = computeQuestionHRV(
-      allIBIs,
-      boundary.start,
-      boundary.end,
-      aggregator.baselineRMSSD
-    );
-    
-    results.set(qIndex, metrics);
-  }
-  
-  return results;
-}

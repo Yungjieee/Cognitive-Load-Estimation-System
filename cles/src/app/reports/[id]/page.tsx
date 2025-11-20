@@ -46,23 +46,7 @@ function generateTimelineSentences(report: any): string[] {
       rmssd_q: response?.metrics?.rmssd_q || null
     };
   });
-  
-  // Analyze events for additional insights
-  report.events.forEach((event: any) => {
-    if (event.etype === 'ten_second_warning' && event.payload?.questionIndex !== undefined) {
-      const questionIndex = event.payload.questionIndex;
-      if (questionIndex >= 0 && questionIndex < report.responses.length) {
-        questionStats[questionIndex].timeWarnings++;
-      }
-    }
-    if (event.etype === 'choose_skip' && event.payload?.questionIndex !== undefined) {
-      const questionIndex = event.payload.questionIndex;
-      if (questionIndex >= 0 && questionIndex < report.responses.length) {
-        questionStats[questionIndex].wasSkipped = true;
-      }
-    }
-  });
-  
+
   // Per question analysis - iterate over all 5 questions
   questionStats.forEach((stats: any, index: number) => {
     const questionNum = index + 1;
@@ -160,8 +144,8 @@ export default function ReportPage() {
         const sessionData = await DatabaseClient.getSessionWithDetails(reportId);
         
         if (sessionData) {
-          const { session, responses, events, subtopic } = sessionData;
-          
+          const { session, responses, subtopic } = sessionData;
+
           setReport({
             id: String(session.id),
             date: formatDate(session.started_at),
@@ -174,7 +158,6 @@ export default function ReportPage() {
             avgLoad: 0.5, // TODO: Calculate from responses
             attentionRate: session.attention_rate || null,
             responses: responses,
-            events: events,
             rmssdBaseline: session.rmssd_baseline || null,
             rmssdConfidence: session.rmssd_confidence || null,
           });

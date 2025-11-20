@@ -1,10 +1,9 @@
 // Session engine for CLES sessions
 // Implements the complete flow according to the specification
 
-import { SCHEDULE, PENALTY_HINT_PER_USE, PENALTY_EXTRA_TIME_TOTAL, EXTRA_TIME_FACTOR, EVENT_TYPES } from './config';
+import { SCHEDULE, PENALTY_HINT_PER_USE, PENALTY_EXTRA_TIME_TOTAL, EXTRA_TIME_FACTOR } from './config';
 import { Question, Answer } from './questionTypes';
 import { timerController } from './TimerController';
-import { eventLogger } from './eventLogger';
 import { liveStreamsManager } from './liveStreams';
 import { HRV_CONFIG } from './hrvConfig';
 import {
@@ -40,7 +39,6 @@ export interface SessionState {
   scores: number[];
   totalScore: number;
   totalPenalties: number;
-  events: any[];
   isCompleted: boolean;
   startedAt: string;
 }
@@ -53,7 +51,6 @@ export interface SessionResult {
   questionsSkipped: number;
   hintsUsed: number;
   extraTimeRequests: number;
-  events: any[];
 }
 
 class SessionEngine {
@@ -103,7 +100,6 @@ class SessionEngine {
       scores: new Array(5).fill(0),
       totalScore: 0,
       totalPenalties: 0,
-      events: [],
       isCompleted: false,
       startedAt: new Date().toISOString()
     };
@@ -121,15 +117,6 @@ class SessionEngine {
       onTimeout: () => {
         this.handleTimeout();
       }
-    });
-
-    // Log session start
-    this.logEvent(EVENT_TYPES.SESSION_START, {
-      sessionId,
-      userId,
-      subtopicId,
-      mode,
-      questionCount: questions.length
     });
 
     // Start first question
@@ -197,11 +184,8 @@ class SessionEngine {
     // Start timer
     timerController.start();
 
-    // Set current question for q_label tagging (before emitting boundary)
+    // Set current question for q_label tagging
     this.setCurrentQuestion(questionIndex + 1);
-
-    // Emit question_start boundary for HRV tracking
-    this.emitQuestionBoundary(questionIndex + 1, 'question_start');
 
     // Start attention capture on first question
     if (questionIndex === 0 && !this.attentionCaptureInterval) {
@@ -212,40 +196,6 @@ class SessionEngine {
     this.scheduleStressorBanner();
 
     this.updateState();
-  }
-
-  // Emit question boundary for HRV tracking
-  private async emitQuestionBoundary(qIndex: number, eventType: 'question_start' | 'question_end'): Promise<void> {
-    if (!this.state) return;
-
-    try {
-      const timestamp = Date.now() - new Date(this.state.startedAt).getTime();
-
-      console.log(`📍 Emitting boundary: Session ${this.state.sessionId}, Q${qIndex} ${eventType} at ${timestamp}ms`);
-
-      // Call the API endpoint to mark question boundary
-      const response = await fetch(`/api/sessions/${this.state.sessionId}/mark`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          qIndex,
-          timestamp,
-          eventType
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`✅ Boundary marked successfully: Q${qIndex} ${eventType}`);
-      } else {
-        const errorData = await response.json();
-        console.error(`❌ Failed to mark boundary (${response.status}):`, errorData);
-      }
-    } catch (error) {
-      console.error('❌ Error emitting question boundary:', error);
-    }
   }
 
   // Set current question for q_label tagging
@@ -657,11 +607,6 @@ class SessionEngine {
         this.state.showStressor = true;
         this.state.stressorMessage = this.getRandomStressorMessage();
         this.updateState();
-
-        this.logEvent(EVENT_TYPES.STRESSOR_SHOW, {
-          questionIndex: this.state.currentQuestionIndex,
-          message: this.state.stressorMessage
-        });
       }
     }, showTime * 1000);
   }
@@ -691,11 +636,6 @@ class SessionEngine {
   private handleTenSecondWarning(secondsLeft: number): void {
     if (!this.state) return;
 
-    this.logEvent(EVENT_TYPES.TEN_SECOND_WARNING, {
-      questionIndex: this.state.currentQuestionIndex,
-      secondsLeft
-    });
-
     this.updateState();
   }
 
@@ -705,10 +645,6 @@ class SessionEngine {
 
     this.state.showTimeUpModal = true;
     this.state.isPaused = true;
-
-    this.logEvent(EVENT_TYPES.TIME_UP_MODAL_OPEN, {
-      questionIndex: this.state.currentQuestionIndex
-    });
 
     this.updateState();
   }
@@ -763,9 +699,6 @@ class SessionEngine {
     this.state.showReveal = true;
     this.state.isPaused = true;
 
-    // Emit question_end boundary for HRV tracking
-    await this.emitQuestionBoundary(questionIndex + 1, 'question_end');
-
     // Calculate HRV for this question
     await this.calculateQuestionHRV(questionIndex + 1);
 
@@ -782,16 +715,6 @@ class SessionEngine {
       examplePenalty,
       this.state.extraTimeUsed[questionIndex]
     );
-
-    // Log answer submission
-    this.logEvent(EVENT_TYPES.ANSWER_SUBMIT, {
-      questionIndex,
-      answer,
-      isCorrect,
-      pointsAwarded,
-      hintsUsed: this.state.hintsUsed[questionIndex],
-      timeSpent: config.limit - this.state.timeRemaining
-    });
 
     this.updateState();
   }
@@ -847,13 +770,6 @@ class SessionEngine {
     // Apply penalty for hint or example (already deducted from pointsAwarded, so don't double-count)
     // this.state.totalPenalties += PENALTY_HINT_PER_USE;
 
-    // Log hint usage
-    this.logEvent(type === 'hint' ? EVENT_TYPES.HINT_OPEN : EVENT_TYPES.EXAMPLE_OPEN, {
-      questionIndex,
-      hintNumber: this.state.hintsUsed[questionIndex],
-      type
-    });
-
     this.updateState();
   }
 
@@ -883,13 +799,6 @@ class SessionEngine {
 
     // Close modal
     this.state.showTimeUpModal = false;
-
-    // Log extra time request
-    this.logEvent(EVENT_TYPES.CHOOSE_EXTRA_TIME, {
-      questionIndex,
-      penalty: PENALTY_EXTRA_TIME_TOTAL,
-      extraTimeAdded: extraTimeToAdd
-    });
 
     this.updateState();
     
@@ -958,14 +867,6 @@ class SessionEngine {
     this.state.showTimeUpModal = false;
     this.state.showSkipConfirmation = false;
 
-    // Log skip
-    await this.logEvent(EVENT_TYPES.CHOOSE_SKIP, {
-      questionIndex
-    });
-
-    // Emit question_end boundary for HRV tracking
-    await this.emitQuestionBoundary(questionIndex + 1, 'question_end');
-
     // Calculate HRV for this question (even if skipped - valuable stress data)
     await this.calculateQuestionHRV(questionIndex + 1);
 
@@ -993,11 +894,6 @@ class SessionEngine {
 
     this.state.showStressor = false;
 
-    this.logEvent(EVENT_TYPES.STRESSOR_DISMISS, {
-      questionIndex: this.state.currentQuestionIndex,
-      message: this.state.stressorMessage
-    });
-
     this.updateState();
   }
 
@@ -1006,11 +902,6 @@ class SessionEngine {
     if (!this.state) return;
 
     const questionIndex = this.state.currentQuestionIndex;
-    
-    // Log next click
-    this.logEvent(EVENT_TYPES.NEXT_CLICK, {
-      questionIndex
-    });
 
     // Check if this is the last question
     if (questionIndex >= this.state.questions.length - 1) {
@@ -1036,13 +927,6 @@ class SessionEngine {
       throw new Error('Session not initialized');
     }
 
-    // Log session end
-    await this.logEvent(EVENT_TYPES.SESSION_END, {
-      sessionId: this.state.sessionId,
-      totalScore: this.state.totalScore,
-      totalPenalties: this.state.totalPenalties
-    });
-
     // Calculate final score
     const finalScore = Math.max(0, Number((this.state.totalScore - this.state.totalPenalties).toFixed(1)));
     const percentage = (finalScore / 10) * 100;
@@ -1053,25 +937,6 @@ class SessionEngine {
       await DatabaseClient.updateSessionScore(parseInt(this.state.sessionId), finalScore);
     } catch (error) {
       console.error('Failed to update session score:', error);
-    }
-
-    // Process HRV data for all questions
-    try {
-      const response = await fetch(`/api/sessions/${this.state.sessionId}/process-hrv`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      if (!response.ok) {
-        console.warn(`Failed to process HRV data: ${response.statusText}`);
-      } else {
-        const result = await response.json();
-        console.log('HRV processing completed:', result);
-      }
-    } catch (error) {
-      console.warn('Error processing HRV data:', error);
     }
 
     // Stop attention capture
@@ -1087,8 +952,7 @@ class SessionEngine {
       questionsAnswered: this.state.questions.length,
       questionsSkipped: this.state.scores.filter(s => s === 0).length,
       hintsUsed: this.state.hintsUsed.reduce((sum, h) => sum + h, 0),
-      extraTimeRequests: this.state.extraTimeUsed.filter(e => e).length,
-      events: [...this.state.events]
+      extraTimeRequests: this.state.extraTimeUsed.filter(e => e).length
     };
 
     this.state.isCompleted = true;
@@ -1097,37 +961,6 @@ class SessionEngine {
     return result;
   }
 
-  // Log event
-  private async logEvent(type: string, payload: any): Promise<void> {
-    if (!this.state) return;
-
-    const event = {
-      id: `${this.state.sessionId}-${Date.now()}-${Math.random()}`,
-      timestamp: new Date().toISOString(),
-      type,
-      questionIndex: this.state.currentQuestionIndex,
-      payload
-    };
-
-    this.state.events.push(event);
-    eventLogger.logEvent(event.type, event.payload, event.questionIndex);
-
-    // Persist event to database
-    try {
-      const { DatabaseClient } = await import('./database');
-      await DatabaseClient.createEvent({
-        session_id: this.state.sessionId,
-        ts_ms: Date.now(),
-        etype: type,
-        payload: {
-          ...payload,
-          questionIndex: this.state.currentQuestionIndex
-        }
-      });
-    } catch (error) {
-      console.error('Failed to persist event:', error);
-    }
-  }
 
   // Update state and notify callback
   private updateState(): void {

@@ -1,8 +1,6 @@
 // Live streams monitoring system for CLES sessions
 // Handles webcam attention monitoring
 
-import { eventLogger } from './eventLogger';
-
 export interface StreamStatus {
   webcam: {
     active: boolean;

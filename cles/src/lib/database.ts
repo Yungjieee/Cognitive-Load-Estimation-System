@@ -224,11 +224,10 @@ export class DatabaseClient {
     return data || []
   }
 
-  // Get session with responses and events
+  // Get session with responses
   static async getSessionWithDetails(sessionId: string | number): Promise<{
     session: Session
     responses: Response[]
-    events: Event[]
     subtopic: Subtopic
   } | null> {
     // Get session
@@ -264,19 +263,9 @@ export class DatabaseClient {
 
     if (responsesError) throw responsesError
 
-    // Get events
-    const { data: events, error: eventsError } = await supabase
-      .from('events')
-      .select('*')
-      .eq('session_id', Number(sessionId))
-      .order('ts_ms', { ascending: true })
-
-    if (eventsError) throw eventsError
-
     return {
       session,
       responses: responses || [],
-      events: events || [],
       subtopic: session.subtopics
     }
   }
@@ -573,34 +562,6 @@ export class DatabaseClient {
     return data
   }
 
-  // Event operations
-  static async createEvent(eventData: {
-    session_id: string
-    ts_ms: number
-    etype: string
-    payload?: any
-  }): Promise<Event> {
-    const { data, error } = await supabase
-      .from('events')
-      .insert([eventData])
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
-  }
-
-  static async getSessionEvents(sessionId: string): Promise<Event[]> {
-    const { data, error } = await supabase
-      .from('events')
-      .select('*')
-      .eq('session_id', Number(sessionId))
-      .order('ts_ms')
-
-    if (error) throw error
-    return data
-  }
-
   // HR Beat operations
   static async createHRBeat(beatData: {
     session_id: string
@@ -738,45 +699,6 @@ export class DatabaseClient {
       .eq('q_index', qIndex)
 
     if (error) throw error
-  }
-
-  static async markQuestionBoundary(
-    sessionId: number,
-    qIndex: number,
-    timestamp: number,
-    eventType: 'question_start' | 'question_end'
-  ): Promise<void> {
-    const { error } = await supabase
-      .from('events')
-      .insert({
-        session_id: sessionId,
-        ts_ms: timestamp,
-        etype: eventType,
-        payload: { q_index: qIndex }
-      })
-
-    if (error) throw error
-  }
-
-  static async getQuestionBoundaries(sessionId: number): Promise<Array<{
-    q_index: number;
-    event_type: string;
-    timestamp: number;
-  }>> {
-    const { data, error } = await supabase
-      .from('events')
-      .select('ts_ms, etype, payload')
-      .eq('session_id', sessionId)
-      .in('etype', ['question_start', 'question_end'])
-      .order('ts_ms')
-
-    if (error) throw error
-
-    return data.map(event => ({
-      q_index: event.payload.q_index,
-      event_type: event.etype,
-      timestamp: event.ts_ms
-    }))
   }
 
   // ============================================================================

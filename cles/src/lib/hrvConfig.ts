@@ -36,10 +36,3 @@ export interface HRBeat {
   ibi_ms: number;
   bpm: number;
 }
-
-export interface QuestionBoundary {
-  sessionId: number;
-  qIndex: number;
-  timestamp: number;
-  eventType: 'question_start' | 'question_end';
-}
