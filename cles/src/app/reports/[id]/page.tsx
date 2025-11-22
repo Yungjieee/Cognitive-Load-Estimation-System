@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { DatabaseClient } from "@/lib/database";
+import ReactMarkdown from 'react-markdown';
 
 function formatDate(dateString: string): string {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -31,6 +32,9 @@ export default function ReportPage() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<number[]>([]);
+  const [insights, setInsights] = useState<string | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
+  const [insightsError, setInsightsError] = useState(false);
 
   useEffect(() => {
     async function loadReport() {
@@ -79,6 +83,37 @@ export default function ReportPage() {
 
     loadReport();
   }, [reportId]);
+
+  // Load AI-generated insights
+  useEffect(() => {
+    async function loadInsights() {
+      if (!reportId || !report) return;
+
+      setLoadingInsights(true);
+      setInsightsError(false);
+
+      try {
+        const response = await fetch(`/api/reports/${reportId}/insights`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch insights');
+        }
+
+        const data = await response.json();
+        setInsights(data.insights);
+      } catch (error) {
+        console.error('Error loading insights:', error);
+        setInsightsError(true);
+      } finally {
+        setLoadingInsights(false);
+      }
+    }
+
+    // Only load insights after report data is loaded
+    if (report) {
+      loadInsights();
+    }
+  }, [report, reportId]);
 
   const toggleCard = (qIndex: number) => {
     setExpandedCards(prev =>
@@ -866,27 +901,85 @@ export default function ReportPage() {
           })()}
         </div>
 
-        {/* Narrative Insights */}
+        {/* AI-Powered Insights */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">💡</span>
+              <span className="text-white font-bold text-sm">✨</span>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Insights</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI-Powered Insights</h2>
+            <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 rounded-full font-medium">
+              Powered by Gemini
+            </span>
           </div>
-          <div className="space-y-4 text-sm text-gray-600 dark:text-gray-300">
-            <p className="leading-relaxed">
-              Your cognitive load was moderate overall (42%). Questions 3 and 5 showed higher load levels,
-              suggesting these topics may need more practice.
-            </p>
-            <p className="leading-relaxed">
-              {report.mode === "support" && "You used hints effectively, which helped maintain engagement without over-reliance."}
-              {report.mode === "no_support" && "Working independently showed good self-regulation skills."}
-            </p>
-            <p className="leading-relaxed">
-              Consider revisiting array traversal concepts and time complexity analysis to strengthen your foundation.
-            </p>
-          </div>
+
+          {loadingInsights ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-4 border-purple-200 border-t-purple-600 dark:border-gray-700 dark:border-t-purple-400 mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400 text-sm">Analyzing your learning patterns...</p>
+            </div>
+          ) : insightsError ? (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-4">⚠️</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2">Unable to generate insights</p>
+              <p className="text-sm text-gray-500 dark:text-gray-500">Please try refreshing the page</p>
+            </div>
+          ) : insights ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {(() => {
+                // Parse insights into sections
+                const sections = [
+                  { title: 'Performance Summary', icon: '📊', color: 'from-blue-500 to-blue-600' },
+                  { title: 'Key Patterns', icon: '🔍', color: 'from-purple-500 to-purple-600' },
+                  { title: 'What Worked Well', icon: '✅', color: 'from-green-500 to-green-600' },
+                  { title: 'What to Improve', icon: '📈', color: 'from-orange-500 to-orange-600' },
+                  { title: 'Action Items', icon: '🎯', color: 'from-red-500 to-red-600' }
+                ];
+
+                // Parse markdown to extract sections
+                const parsedSections = sections.map(section => {
+                  const regex = new RegExp(`###\\s*${section.title}\\s*\\n([\\s\\S]*?)(?=###|$)`, 'i');
+                  const match = insights.match(regex);
+                  if (match) {
+                    const content = match[1].trim();
+                    // Extract bullet points (handle both * and -)
+                    const bullets = content
+                      .split('\n')
+                      .map(line => line.trim())
+                      .filter(line => line.startsWith('*') || line.startsWith('-'))
+                      .map(line => line.replace(/^[*\-]\s*/, '').trim())
+                      .filter(line => line.length > 0);
+                    return { ...section, bullets };
+                  }
+                  return { ...section, bullets: [] };
+                }).filter(section => section.bullets.length > 0);
+
+                return parsedSections.map((section, index) => (
+                  <div
+                    key={index}
+                    className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-xl p-5 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow ${section.title === 'Action Items' ? 'md:col-span-2' : ''}`}
+                  >
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${section.color} flex items-center justify-center text-white text-xl`}>
+                        {section.icon}
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                        {section.title}
+                      </h3>
+                    </div>
+                    <ul className="space-y-2.5">
+                      {section.bullets.map((bullet, i) => (
+                        <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
+                          <span className="text-purple-500 dark:text-purple-400 mt-1 flex-shrink-0">•</span>
+                          <span className="leading-relaxed">{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ));
+              })()}
+            </div>
+          ) : null}
         </div>
 
         {/* Actions */}

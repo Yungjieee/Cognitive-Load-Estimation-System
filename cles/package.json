@@ -11,12 +11,14 @@
     "db:health": "node scripts/db-healthcheck.mjs"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.75.1",
     "@types/ws": "^8.18.1",
     "mqtt": "^5.14.1",
     "next": "15.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-markdown": "^10.1.0",
     "ws": "^8.18.3"
   },
   "devDependencies": {

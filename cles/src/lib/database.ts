@@ -115,6 +115,13 @@ export interface HRBeat {
   created_at: string
 }
 
+export interface ReportInsights {
+  id: number
+  session_id: number
+  insights_text: string
+  created_at: string
+}
+
 // NASA-TLX System (per-question calculations)
 export interface NasaTlxSystem {
   id: number
@@ -729,7 +736,22 @@ export class DatabaseClient {
   }
 
   static async getSessionNasaTlxSystem(sessionId: string): Promise<NasaTlxSystem[]> {
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS for server-side operations
+    if (!supabaseAdmin) {
+      // Fallback to regular client if admin not configured
+      
+      const { data, error } = await supabase
+        .from('nasa_tlx_system')
+        .select('*')
+        .eq('session_id', Number(sessionId))
+        .order('q_index')
+
+      if (error) throw error
+      return data
+    }
+
+    // Use admin client for server-side API routes
+    const { data, error } = await supabaseAdmin
       .from('nasa_tlx_system')
       .select('*')
       .eq('session_id', Number(sessionId))
@@ -789,7 +811,25 @@ export class DatabaseClient {
   }
 
   static async getSessionNasaTlxUser(sessionId: string): Promise<NasaTlxUser | null> {
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS for server-side operations
+    if (!supabaseAdmin) {
+      // Fallback to regular client if admin not configured
+      
+      const { data, error } = await supabase
+        .from('nasa_tlx_user')
+        .select('*')
+        .eq('session_id', Number(sessionId))
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') return null // No rows found
+        throw error
+      }
+      return data
+    }
+
+    // Use admin client for server-side API routes
+    const { data, error } = await supabaseAdmin
       .from('nasa_tlx_user')
       .select('*')
       .eq('session_id', Number(sessionId))
@@ -824,7 +864,25 @@ export class DatabaseClient {
   }
 
   static async getSessionCognitiveLoadSummary(sessionId: string): Promise<CognitiveLoadSummary | null> {
-    const { data, error } = await supabase
+    // Use admin client to bypass RLS for server-side operations
+    if (!supabaseAdmin) {
+      // Fallback to regular client if admin not configured
+      
+      const { data, error } = await supabase
+        .from('cognitive_load_summary')
+        .select('*')
+        .eq('session_id', Number(sessionId))
+        .single()
+
+      if (error) {
+        if (error.code === 'PGRST116') return null // No rows found
+        throw error
+      }
+      return data
+    }
+
+    // Use admin client for server-side API routes
+    const { data, error } = await supabaseAdmin
       .from('cognitive_load_summary')
       .select('*')
       .eq('session_id', Number(sessionId))
@@ -835,6 +893,70 @@ export class DatabaseClient {
       throw error
     }
     return data
+  }
+
+  /**
+   * Get cached AI-generated insights for a session report
+   * Returns null if no insights exist yet
+   * Uses admin client to ensure server-side API routes can access the data
+   */
+  static async getReportInsights(sessionId: string | number): Promise<ReportInsights | null> {
+    // Use admin client to bypass RLS for server-side operations
+    if (!supabaseAdmin) {
+      // Fallback to regular client if admin not configured
+      // (for client-side usage where auth.uid() exists)
+      console.warn('Supabase admin client not configured. Falling back to regular client.')
+      const { data, error } = await supabase
+        .from('report_insights')
+        .select('*')
+        .eq('session_id', sessionId)
+        .single()
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+        console.error('Error fetching report insights:', error)
+      }
+
+      return data
+    }
+
+    // Use admin client for server-side API routes
+    const { data, error } = await supabaseAdmin
+      .from('report_insights')
+      .select('*')
+      .eq('session_id', sessionId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+      console.error('Error fetching report insights:', error)
+    }
+
+    return data
+  }
+
+  /**
+   * Save newly generated AI insights for a session report
+   * This is called after Gemini generates the insights
+   * Uses admin client to bypass RLS since this is a server-side operation
+   */
+  static async saveReportInsights(
+    sessionId: string | number,
+    insightsText: string
+  ): Promise<void> {
+    if (!supabaseAdmin) {
+      throw new Error('Supabase admin client not configured. Please set SUPABASE_SERVICE_ROLE_KEY in environment variables.')
+    }
+
+    const { error } = await supabaseAdmin
+      .from('report_insights')
+      .insert({
+        session_id: sessionId,
+        insights_text: insightsText
+      })
+
+    if (error) {
+      console.error('Error saving report insights:', error)
+      throw error
+    }
   }
 
   // Utility functions

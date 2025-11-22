@@ -167,6 +167,14 @@ CREATE TABLE public.cognitive_load_summary (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Report Insights (AI-generated insights from Gemini)
+CREATE TABLE public.report_insights (
+  id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT REFERENCES public.sessions(id) ON DELETE CASCADE UNIQUE,
+  insights_text TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX idx_users_email ON public.users(email);
 CREATE INDEX idx_subtopics_key ON public.subtopics(key);
@@ -187,6 +195,7 @@ CREATE INDEX idx_nasa_tlx_system_session ON public.nasa_tlx_system(session_id);
 CREATE INDEX idx_nasa_tlx_system_question ON public.nasa_tlx_system(q_index);
 CREATE INDEX idx_nasa_tlx_user_session ON public.nasa_tlx_user(session_id);
 CREATE INDEX idx_cognitive_load_summary_session ON public.cognitive_load_summary(session_id);
+CREATE INDEX idx_report_insights_session ON public.report_insights(session_id);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -198,6 +207,7 @@ ALTER TABLE public.attention_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nasa_tlx_system ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nasa_tlx_user ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cognitive_load_summary ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.report_insights ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own data
 CREATE POLICY "Users can view own profile" ON public.users
@@ -257,6 +267,12 @@ CREATE POLICY "Users can view own cognitive_load_summary" ON public.cognitive_lo
 CREATE POLICY "Users can create own cognitive_load_summary" ON public.cognitive_load_summary
   FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
+CREATE POLICY "Users can view own report_insights" ON public.report_insights
+  FOR SELECT USING (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
+CREATE POLICY "Users can create own report_insights" ON public.report_insights
+  FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
+
 -- Public read access for subtopics and questions
 CREATE POLICY "Anyone can view subtopics" ON public.subtopics
   FOR SELECT USING (true);
@@ -296,5 +312,8 @@ CREATE POLICY "Service role can manage all nasa_tlx_user" ON public.nasa_tlx_use
   FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "Service role can manage all cognitive_load_summary" ON public.cognitive_load_summary
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role can manage all report_insights" ON public.report_insights
   FOR ALL USING (auth.role() = 'service_role');
 
