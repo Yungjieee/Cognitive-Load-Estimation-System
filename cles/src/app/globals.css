@@ -98,3 +98,144 @@ body {
   transform: translateY(-4px);
   box-shadow: 0 10px 30px rgba(139, 92, 246, 0.15);
 }
+
+/* Print styles for PDF export */
+@media print {
+  /* Hide elements that shouldn't be printed */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Hide navigation bar */
+  nav,
+  header,
+  [role="navigation"],
+  [class*="nav"],
+  [class*="header"] {
+    display: none !important;
+  }
+
+  /* Optimize layout for paper */
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Optimize page margins and size */
+  @page {
+    margin: 1cm;
+    size: A4 portrait;
+  }
+
+  /* Remove page background gradient but keep content backgrounds */
+  body > div {
+    background: white !important;
+  }
+
+  /* Ensure all text is visible */
+  * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Remove backdrop blur but keep solid backgrounds */
+  * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Keep card backgrounds visible */
+  [class*="bg-white"],
+  [class*="bg-gray"],
+  [class*="bg-purple"] {
+    background-color: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  /* Ensure gradient badges are visible */
+  .gradient-bg {
+    background: #8b5cf6 !important;
+    color: white !important;
+  }
+
+  /* Make sure all text colors are dark enough */
+  .text-gray-700,
+  .dark\:text-gray-300 {
+    color: #374151 !important;
+  }
+
+  .text-gray-900,
+  .dark\:text-white {
+    color: #111827 !important;
+  }
+
+  .text-gray-600,
+  .dark\:text-gray-400 {
+    color: #4b5563 !important;
+  }
+
+  /* Remove shadows for cleaner print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Remove animations and transitions */
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Page break controls - prevent breaks inside important elements */
+  #report-container > div,
+  [class*="rounded-2xl"],
+  [class*="rounded-xl"] {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Allow page breaks between major sections */
+  #report-container > div + div {
+    page-break-before: auto !important;
+  }
+
+  /* Compact spacing for print */
+  .mx-auto {
+    max-width: 100% !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Reduce vertical spacing */
+  .mb-8 {
+    margin-bottom: 1rem !important;
+  }
+
+  .py-10 {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  /* Keep borders visible */
+  [class*="border"] {
+    border-color: #d1d5db !important;
+  }
+
+  /* Ensure overview card grid is visible */
+  .grid {
+    display: grid !important;
+  }
+
+  /* Make sure colored badges print correctly */
+  .badge,
+  [class*="bg-green"],
+  [class*="bg-yellow"],
+  [class*="bg-red"],
+  [class*="bg-purple"],
+  [class*="bg-blue"] {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -164,11 +164,16 @@ export default function ReportPage() {
   }
 
   function handleDownloadPDF() {
-    setLoading(true);
-    // Placeholder: simulate PDF generation
+    // Set document title for PDF filename suggestion
+    const originalTitle = document.title;
+    document.title = `Report-${reportId}-${report.subtopic}`;
+
+    // Trigger browser print dialog (user can save as PDF)
+    window.print();
+
+    // Restore original title after print dialog
     setTimeout(() => {
-      setLoading(false);
-      alert("PDF download started (placeholder)");
+      document.title = originalTitle;
     }, 1000);
   }
 
@@ -176,7 +181,7 @@ export default function ReportPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="mx-auto max-w-4xl px-4 py-10">
         <div className="mb-8 animate-fade-in">
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-6 no-print">
             <a href="/home" className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 font-medium">
               ← Back to Home
             </a>
@@ -195,6 +200,8 @@ export default function ReportPage() {
           </div>
         </div>
 
+        {/* Report Content Container for PDF Export */}
+        <div id="report-container">
         {/* Overview Card */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
           <div className="flex items-center gap-3 mb-6">
@@ -599,8 +606,7 @@ export default function ReportPage() {
                     </div>
                   </button>
 
-                  {expanded && (
-                    <div className="border-t border-gray-200 dark:border-gray-700 p-6 space-y-6">
+                  <div className={`border-t border-gray-200 dark:border-gray-700 p-6 space-y-6 ${!expanded ? 'hidden print:block' : ''}`}>
                       <div>
                         <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Cognitive Load Breakdown</h4>
                         <div className="space-y-3">
@@ -656,8 +662,7 @@ export default function ReportPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                  </div>
                 </div>
               );
             })}
@@ -981,22 +986,16 @@ export default function ReportPage() {
             </div>
           ) : null}
         </div>
+        </div>
 
         {/* Actions */}
-        <div className="flex gap-4">
+        <div className="flex gap-4 no-print">
           <button
             onClick={handleDownloadPDF}
-            disabled={loading}
+            disabled={!report}
             className="flex-1 rounded-xl px-6 py-3 btn-primary text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-300"
           >
-            {loading ? (
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                Generating...
-              </div>
-            ) : (
-              "Download PDF"
-            )}
+            Print / Save as PDF
           </button>
           <a href="/reports" className="px-6 py-3 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 font-medium">
             📊 All Reports
