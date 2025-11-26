@@ -99,6 +99,23 @@ body {
   box-shadow: 0 10px 30px rgba(139, 92, 246, 0.15);
 }
 
+/* SWOT Analysis - Clean bullet point display */
+.swot-quadrant ul {
+  list-style-type: disc;
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.swot-quadrant li {
+  margin-bottom: 0.875rem;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.swot-quadrant li:last-child {
+  margin-bottom: 0;
+}
+
 /* Print styles for PDF export */
 @media print {
   /* Hide elements that shouldn't be printed */
@@ -237,5 +254,70 @@ body {
     color-adjust: exact !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* ===== SWOT Analysis Print Styles ===== */
+
+  /* SWOT Analysis grid layout for print */
+  #swot-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1rem !important;
+  }
+
+  /* SWOT 2x2 grid should print on one page if possible */
+  .swot-grid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Each SWOT quadrant should stay together */
+  .swot-quadrant {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+
+  /* SWOT strengths background (green tint) */
+  .swot-strengths {
+    background-color: #d1fae5 !important;
+    border-color: #10b981 !important;
+  }
+
+  /* SWOT weaknesses background (red tint) */
+  .swot-weaknesses {
+    background-color: #fee2e2 !important;
+    border-color: #ef4444 !important;
+  }
+
+  /* SWOT opportunities background (blue tint) */
+  .swot-opportunities {
+    background-color: #dbeafe !important;
+    border-color: #3b82f6 !important;
+  }
+
+  /* SWOT threats background (yellow tint) */
+  .swot-threats {
+    background-color: #fef3c7 !important;
+    border-color: #f59e0b !important;
+  }
+
+  /* SWOT bullet points and lists */
+  .swot-quadrant ul {
+    margin: 0 !important;
+    padding-left: 1.5rem !important;
+    color: #1f2937 !important;
+  }
+
+  .swot-quadrant li {
+    color: #1f2937 !important;
+    margin-bottom: 0.75rem !important;
+    line-height: 1.6 !important;
+  }
+
+  /* Timestamp and metadata */
+  .swot-meta {
+    color: #6b7280 !important;
+    font-size: 0.875rem !important;
   }
 }

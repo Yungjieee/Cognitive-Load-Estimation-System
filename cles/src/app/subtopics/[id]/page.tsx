@@ -183,7 +183,7 @@ export default function SubtopicDetailsPage() {
                 <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
                   <span className="text-blue-600 dark:text-blue-400 text-xs">📊</span>
                 </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">Work through 10 questions with real-time monitoring</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">Work through 5 questions with real-time monitoring</span>
               </div>
               <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-700/50">
                 <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">

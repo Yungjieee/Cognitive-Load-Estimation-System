@@ -175,6 +175,30 @@ CREATE TABLE public.report_insights (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- SWOT Analysis (comprehensive analysis across all 3 subtopics)
+CREATE TABLE public.swot_analysis (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE UNIQUE,
+
+  -- SWOT content (AI-generated, stored as TEXT)
+  swot_strengths TEXT NOT NULL,
+  swot_weaknesses TEXT NOT NULL,
+  swot_opportunities TEXT NOT NULL,
+  swot_threats TEXT NOT NULL,
+
+  -- Radar chart data (JSON format)
+  radar_data JSONB NOT NULL,
+
+  -- Stats snapshot at generation time
+  total_sessions_analyzed INTEGER NOT NULL,
+  avg_score_array NUMERIC(4,2),
+  avg_score_linked_list NUMERIC(4,2),
+  avg_score_stack NUMERIC(4,2),
+
+  generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX idx_users_email ON public.users(email);
 CREATE INDEX idx_subtopics_key ON public.subtopics(key);
@@ -196,6 +220,7 @@ CREATE INDEX idx_nasa_tlx_system_question ON public.nasa_tlx_system(q_index);
 CREATE INDEX idx_nasa_tlx_user_session ON public.nasa_tlx_user(session_id);
 CREATE INDEX idx_cognitive_load_summary_session ON public.cognitive_load_summary(session_id);
 CREATE INDEX idx_report_insights_session ON public.report_insights(session_id);
+CREATE INDEX idx_swot_user ON public.swot_analysis(user_id);
 
 -- Row Level Security (RLS) policies
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
@@ -208,6 +233,7 @@ ALTER TABLE public.nasa_tlx_system ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.nasa_tlx_user ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cognitive_load_summary ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.report_insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.swot_analysis ENABLE ROW LEVEL SECURITY;
 
 -- Users can only access their own data
 CREATE POLICY "Users can view own profile" ON public.users
@@ -273,6 +299,12 @@ CREATE POLICY "Users can view own report_insights" ON public.report_insights
 CREATE POLICY "Users can create own report_insights" ON public.report_insights
   FOR INSERT WITH CHECK (auth.uid() = (SELECT user_id FROM public.sessions WHERE id = session_id));
 
+CREATE POLICY "Users can view own SWOT analysis" ON public.swot_analysis
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own SWOT analysis" ON public.swot_analysis
+  FOR UPDATE USING (auth.uid() = user_id);
+
 -- Public read access for subtopics and questions
 CREATE POLICY "Anyone can view subtopics" ON public.subtopics
   FOR SELECT USING (true);
@@ -315,5 +347,8 @@ CREATE POLICY "Service role can manage all cognitive_load_summary" ON public.cog
   FOR ALL USING (auth.role() = 'service_role');
 
 CREATE POLICY "Service role can manage all report_insights" ON public.report_insights
+  FOR ALL USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role can manage all SWOT analysis" ON public.swot_analysis
   FOR ALL USING (auth.role() = 'service_role');
 

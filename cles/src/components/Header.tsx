@@ -89,25 +89,35 @@ export default function Header() {
           // Authenticated user navigation
           <>
             <nav className="hidden sm:flex items-center gap-6 text-sm font-medium">
-              <a 
-                href="/home" 
+              <a
+                href="/home"
                 className={`transition-colors ${
-                  pathname === '/home' 
-                    ? 'text-purple-600 dark:text-purple-400 font-semibold' 
+                  pathname === '/home'
+                    ? 'text-purple-600 dark:text-purple-400 font-semibold'
                     : 'text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
                 }`}
               >
                 Tasks
               </a>
-              <a 
-                href="/reports" 
+              <a
+                href="/reports"
                 className={`transition-colors ${
-                  pathname.startsWith('/reports') 
-                    ? 'text-purple-600 dark:text-purple-400 font-semibold' 
+                  pathname.startsWith('/reports')
+                    ? 'text-purple-600 dark:text-purple-400 font-semibold'
                     : 'text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
                 }`}
               >
                 Reports
+              </a>
+              <a
+                href="/swot-analysis"
+                className={`transition-colors ${
+                  pathname.startsWith('/swot-analysis')
+                    ? 'text-purple-600 dark:text-purple-400 font-semibold'
+                    : 'text-gray-600 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400'
+                }`}
+              >
+                SWOT Analysis
               </a>
             </nav>
             
