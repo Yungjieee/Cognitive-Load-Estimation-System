@@ -189,6 +189,9 @@ CREATE TABLE public.swot_analysis (
   -- Radar chart data (JSON format)
   radar_data JSONB NOT NULL,
 
+  -- Radar chart explanation (AI-generated)
+  radar_explanation TEXT,
+
   -- Stats snapshot at generation time
   total_sessions_analyzed INTEGER NOT NULL,
   avg_score_array NUMERIC(4,2),
