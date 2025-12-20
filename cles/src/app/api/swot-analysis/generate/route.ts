@@ -43,35 +43,35 @@ export async function POST(request: NextRequest) {
 ### Arrays:
 - Sessions completed: ${counts.array}
 - Average score: ${avgScoreArray}/10
-- Average Mental Demand: ${radarData.array.mental}/21
-- Average Physical Demand: ${radarData.array.physical}/21
-- Average Temporal Demand: ${radarData.array.temporal}/21
-- Average Performance: ${radarData.array.performance}/21
-- Average Effort: ${radarData.array.effort}/21
-- Average Frustration: ${radarData.array.frustration}/21
-- Average Overall Cognitive Load: ${radarData.array.cognitiveLoad}/21
+- Average Mental Demand: ${radarData.array.mental}/20
+- Average Physical Demand: ${radarData.array.physical}/20
+- Average Time Pressure: ${radarData.array.temporal}/20
+- Average Task Success: ${(20 - radarData.array.performance).toFixed(1)}/20 (inverted for clarity - higher is better)
+- Average Effort: ${radarData.array.effort}/20
+- Average Frustration: ${radarData.array.frustration}/20
+- Average Overall Cognitive Load: ${radarData.array.cognitiveLoad}/20
 
 ### Linked Lists:
 - Sessions completed: ${counts.linkedList}
 - Average score: ${avgScoreLinkedList}/10
-- Average Mental Demand: ${radarData.linkedList.mental}/21
-- Average Physical Demand: ${radarData.linkedList.physical}/21
-- Average Temporal Demand: ${radarData.linkedList.temporal}/21
-- Average Performance: ${radarData.linkedList.performance}/21
-- Average Effort: ${radarData.linkedList.effort}/21
-- Average Frustration: ${radarData.linkedList.frustration}/21
-- Average Overall Cognitive Load: ${radarData.linkedList.cognitiveLoad}/21
+- Average Mental Demand: ${radarData.linkedList.mental}/20
+- Average Physical Demand: ${radarData.linkedList.physical}/20
+- Average Time Pressure: ${radarData.linkedList.temporal}/20
+- Average Task Success: ${(20 - radarData.linkedList.performance).toFixed(1)}/20 (inverted for clarity - higher is better)
+- Average Effort: ${radarData.linkedList.effort}/20
+- Average Frustration: ${radarData.linkedList.frustration}/20
+- Average Overall Cognitive Load: ${radarData.linkedList.cognitiveLoad}/20
 
 ### Stacks:
 - Sessions completed: ${counts.stack}
 - Average score: ${avgScoreStack}/10
-- Average Mental Demand: ${radarData.stack.mental}/21
-- Average Physical Demand: ${radarData.stack.physical}/21
-- Average Temporal Demand: ${radarData.stack.temporal}/21
-- Average Performance: ${radarData.stack.performance}/21
-- Average Effort: ${radarData.stack.effort}/21
-- Average Frustration: ${radarData.stack.frustration}/21
-- Average Overall Cognitive Load: ${radarData.stack.cognitiveLoad}/21
+- Average Mental Demand: ${radarData.stack.mental}/20
+- Average Physical Demand: ${radarData.stack.physical}/20
+- Average Time Pressure: ${radarData.stack.temporal}/20
+- Average Task Success: ${(20 - radarData.stack.performance).toFixed(1)}/20 (inverted for clarity - higher is better)
+- Average Effort: ${radarData.stack.effort}/20
+- Average Frustration: ${radarData.stack.frustration}/20
+- Average Overall Cognitive Load: ${radarData.stack.cognitiveLoad}/20
 
 ## Task:
 Provide a comprehensive SWOT analysis in markdown format. Each section should have EXACTLY 4 SHORT, CONCISE bullet points.
@@ -84,7 +84,7 @@ Provide a comprehensive SWOT analysis in markdown format. Each section should ha
 [4 bullet points with specific weaknesses, with actionable context- each ONE SHORT SENTENCE only]
 
 ### OPPORTUNITIES
-[4 bullet points withopportunities for growth and learning strategies]
+[4 bullet points with opportunities for growth and learning strategies]
 
 
 ### THREATS
@@ -93,28 +93,29 @@ Provide a comprehensive SWOT analysis in markdown format. Each section should ha
 
 ### RADAR CHART EXPLANATION
 [Analyze the radar chart data above and provide 5-6 bullet points explaining what the student can observe:
-- Compare the three colored areas (Array in purple, Linked List in pink, Stack in green)
-- Point out which topic has the largest/smallest area and what that means
-- Explain patterns like "Array has higher Mental Demand compared to Stack" with actual values
-- CRITICAL: For Performance dimension, LOWER values mean BETTER performance (closer to center = more perfect), HIGHER values mean worse performance
-- For other dimensions (Mental, Physical, Temporal, Effort, Frustration), higher values mean more difficulty/workload
-- Use observations from the actual data (e.g., "Stack shows lowest Frustration at ${radarData.stack.frustration}/21")
-- Keep each bullet SHORT and student-friendly 
+- Compare each dimension across the three topics (Array in purple, Linked List in pink, Stack in green)
+- Identify which topic performs best/worst on specific dimensions with actual values
+- Explain dimension-specific patterns (e.g., "Arrays show higher Mental Demand (15.2/20) compared to Stacks (8.1/20)")
+- NOTE: Task Success values are already inverted for display (HIGHER = BETTER performance, farther from center = more successful)
+- For other dimensions (Mental, Physical, Time Pressure, Effort, Frustration), higher values mean more difficulty/workload (closer to center = better)
+- Use observations from the actual data (e.g., "Stacks achieve highest Task Success at ${(20 - radarData.stack.performance).toFixed(1)}/20 indicating mastery")
+- Keep each bullet SHORT and student-friendly
+- Focus on dimension-by-dimension comparisons rather than overall area comparisons
 - Help students understand what the visible patterns in THEIR chart indicate about their learning experience]
 
 
 ## CRITICAL FORMAT RULES:
-- Each bullet point must be ONE SHORT SENTENCE 
+- Each bullet point must be ONE SHORT SENTENCE
 - NO sub-bullets or nested points
 - NO bold text or special formatting within bullet points
 - Be direct and specific
 - Reference specific topics (Arrays, Linked Lists, Stacks) in SWOT sections
 - Use simple, clear, student-friendly language
-- Be encourraging but honest
+- Be encouraging but honest
 - Provide actionable insights
-- For Performance dimension, LOWER values mean BETTER performance (closer to center = more perfect), HIGHER values mean worse performance
-- For other dimensions (Mental, Physical, Temporal, Effort, Frustration), higher values mean more difficulty/workload
-- Example: "High effort (19.38/21) in Arrays shows strong dedication to learning."
+- NOTE: Task Success values are already inverted (HIGHER = BETTER performance)
+- For other dimensions (Mental, Physical, Time Pressure, Effort, Frustration), higher values mean more difficulty/workload
+- Example: "High effort (19.38/20) in Arrays shows strong dedication" or "Excellent Task Success (19.7/20) in Stacks indicates mastery."
 `;
 
     // Call Gemini

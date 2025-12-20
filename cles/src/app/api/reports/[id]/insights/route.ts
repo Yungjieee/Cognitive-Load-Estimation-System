@@ -46,9 +46,9 @@ function buildGeminiPrompt(
 
 ## Cognitive Load Analysis
 
-### Overall Cognitive Load (0-21 scale)
-- System Measured: ${(cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/21 (${Math.round(((cognitiveLoadSummary?.sys_cognitive_load || 0) / 21) * 100)}%)
-- User Self-Reported: ${nasaTlxUser?.cognitive_load ? nasaTlxUser.cognitive_load.toFixed(1) + '/21 (' + Math.round((nasaTlxUser.cognitive_load / 21) * 100) + '%)' : 'Not completed'}
+### Overall Cognitive Load (0-20 scale)
+- System Measured: ${(cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/20 (${Math.round(((cognitiveLoadSummary?.sys_cognitive_load || 0) / 20) * 100)}%)
+- User Self-Reported: ${nasaTlxUser?.cognitive_load ? nasaTlxUser.cognitive_load.toFixed(1) + '/20 (' + Math.round((nasaTlxUser.cognitive_load / 20) * 100) + '%)' : 'Not completed'}
 
 ### NASA-TLX Dimensions Breakdown (System vs User)
 1. Mental Demand: ${(cognitiveLoadSummary?.sys_mental_demand || 0).toFixed(1)} vs ${nasaTlxUser?.mental_demand?.toFixed(1) || 'N/A'}
@@ -75,7 +75,7 @@ ${nasaTlxSystem.map((q: any) => {
   const response = report.responses.find((r: any) => r.q_index === q.q_index);
   return `
 Question ${q.q_index}:
-- Cognitive Load: ${q.cognitive_load.toFixed(1)}/21 (${Math.round((q.cognitive_load / 21) * 100)}%)
+- Cognitive Load: ${q.cognitive_load.toFixed(1)}/20 (${Math.round((q.cognitive_load / 20) * 100)}%)
 - Result: ${response?.metrics?.skipped ? 'Skipped' : response?.correct ? 'Correct ✓' : 'Incorrect ✗'}
 - Support Used: ${response?.hints_used || 0} hints, ${(response?.metrics?.examplePenalty || 0) > 0 ? 'Example shown' : 'No example'}, ${response?.extra_time_used ? 'Extra time' : 'Normal time'}
 - Attention Rate: ${response?.attention_rate ? Math.round(response.attention_rate) + '%' : 'N/A'}
@@ -108,6 +108,8 @@ Provide concise, actionable insights in the following format. Be brief and speci
 - Use simple, direct language
 - Reference specific question numbers when relevant
 - Focus on actionable insights only
+- CRITICAL: For Performance dimension, LOWER values mean BETTER performance, HIGHER values mean worse performance
+- For other dimensions (Mental, Physical, Temporal, Effort, Frustration), higher values mean more difficulty/workload
 `;
 }
 

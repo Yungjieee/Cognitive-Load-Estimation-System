@@ -137,14 +137,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.mental_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.mental_demand}
               onChange={(e) => {
@@ -159,7 +159,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -183,14 +183,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.physical_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.physical_demand}
               onChange={(e) => {
@@ -205,7 +205,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -229,14 +229,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.temporal_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.temporal_demand}
               onChange={(e) => {
@@ -251,7 +251,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -271,21 +271,21 @@ export default function SurveyPage() {
                 How well did you do? Did you complete the task successfully or struggle with it?
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-1">
-                (0 = perfect, 21 = failure)
+                (0 = perfect, 20 = failure)
               </p>
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.performance}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.performance}
               onChange={(e) => {
@@ -300,7 +300,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -324,14 +324,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.effort}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.effort}
               onChange={(e) => {
@@ -346,7 +346,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -370,14 +370,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.frustration}
               </div>
-              <div className="text-xs text-gray-500">/ 21</div>
+              <div className="text-xs text-gray-500">/ 20</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="21"
+              max="20"
               step="1"
               value={ratings.frustration}
               onChange={(e) => {
@@ -392,7 +392,7 @@ export default function SurveyPage() {
               <span>5</span>
               <span>10</span>
               <span>15</span>
-              <span>21</span>
+              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">

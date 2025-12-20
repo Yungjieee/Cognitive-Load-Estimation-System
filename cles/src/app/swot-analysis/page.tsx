@@ -483,7 +483,7 @@ export default function SwotAnalysisPage() {
                 📊 Performance Comparison Across Topics
               </h2>
               <p className="text-sm text-gray-600 mb-6 text-center">
-                6 NASA-TLX Dimensions (Scale: 0-21)
+                6 NASA-TLX Dimensions (Scale: 0-20)
               </p>
 
               <RadarChartComponent radarData={swotData.radar_data} />
@@ -510,17 +510,17 @@ export default function SwotAnalysisPage() {
                 <div className="text-center">
                   <div className="font-semibold text-purple-600">Array</div>
                   <div className="text-gray-600">Avg Score: {swotData.avg_score_array ?? 'N/A'}/10</div>
-                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.array.cognitiveLoad}/21</div>
+                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.array.cognitiveLoad}/20</div>
                 </div>
                 <div className="text-center">
                   <div className="font-semibold text-pink-600">Linked List</div>
                   <div className="text-gray-600">Avg Score: {swotData.avg_score_linked_list ?? 'N/A'}/10</div>
-                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.linkedList.cognitiveLoad}/21</div>
+                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.linkedList.cognitiveLoad}/20</div>
                 </div>
                 <div className="text-center">
                   <div className="font-semibold text-green-600">Stack</div>
                   <div className="text-gray-600">Avg Score: {swotData.avg_score_stack ?? 'N/A'}/10</div>
-                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.stack.cognitiveLoad}/21</div>
+                  <div className="text-gray-600">Avg Cognitive Load: {swotData.radar_data.stack.cognitiveLoad}/20</div>
                 </div>
               </div>
             </div>
@@ -577,6 +577,21 @@ export default function SwotAnalysisPage() {
 
 // Radar Chart Component
 function RadarChartComponent({ radarData }: { radarData: SwotAnalysis['radar_data'] }) {
+  // State to track which topics are visible
+  const [visibleTopics, setVisibleTopics] = useState({
+    array: true,
+    linkedList: true,
+    stack: true
+  })
+
+  // Toggle topic visibility
+  const toggleTopic = (topic: 'array' | 'linkedList' | 'stack') => {
+    setVisibleTopics(prev => ({
+      ...prev,
+      [topic]: !prev[topic]
+    }))
+  }
+
   // Transform data from DB format to Recharts format
   const chartData = [
     {
@@ -592,16 +607,16 @@ function RadarChartComponent({ radarData }: { radarData: SwotAnalysis['radar_dat
       Stack: radarData.stack.physical,
     },
     {
-      dimension: 'Temporal',
+      dimension: 'Time Pressure',
       Array: radarData.array.temporal,
       'Linked List': radarData.linkedList.temporal,
       Stack: radarData.stack.temporal,
     },
     {
-      dimension: 'Performance',
-      Array: radarData.array.performance,
-      'Linked List': radarData.linkedList.performance,
-      Stack: radarData.stack.performance,
+      dimension: 'Task Success',
+      Array: 20 - radarData.array.performance,
+      'Linked List': 20 - radarData.linkedList.performance,
+      Stack: 20 - radarData.stack.performance,
     },
     {
       dimension: 'Effort',
@@ -618,55 +633,106 @@ function RadarChartComponent({ radarData }: { radarData: SwotAnalysis['radar_dat
   ]
 
   return (
-    <ResponsiveContainer width="100%" height={500}>
-      <RadarChart data={chartData}>
-        <PolarGrid />
-        <PolarAngleAxis dataKey="dimension" />
-        <PolarRadiusAxis angle={90} domain={[0, 21]} />
+    <>
+      <ResponsiveContainer width="100%" height={500}>
+        <RadarChart data={chartData}>
+          <PolarGrid />
+          <PolarAngleAxis dataKey="dimension" />
+          <PolarRadiusAxis angle={90} domain={[0, 20]} />
 
-        <Radar
-          name="Array"
-          dataKey="Array"
-          stroke="#8b5cf6"
-          fill="#8b5cf6"
-          fillOpacity={0.3}
-        />
-        <Radar
-          name="Linked List"
-          dataKey="Linked List"
-          stroke="#ec4899"
-          fill="#ec4899"
-          fillOpacity={0.3}
-        />
-        <Radar
-          name="Stack"
-          dataKey="Stack"
-          stroke="#10b981"
-          fill="#10b981"
-          fillOpacity={0.3}
-        />
+          {visibleTopics.array && (
+            <Radar
+              name="Array"
+              dataKey="Array"
+              stroke="#8b5cf6"
+              fill="#8b5cf6"
+              fillOpacity={0.3}
+            />
+          )}
+          {visibleTopics.linkedList && (
+            <Radar
+              name="Linked List"
+              dataKey="Linked List"
+              stroke="#ec4899"
+              fill="#ec4899"
+              fillOpacity={0.3}
+            />
+          )}
+          {visibleTopics.stack && (
+            <Radar
+              name="Stack"
+              dataKey="Stack"
+              stroke="#10b981"
+              fill="#10b981"
+              fillOpacity={0.3}
+            />
+          )}
 
-        <Tooltip
-          formatter={(value: number) => `${value}/21`}
-          contentStyle={{
-            backgroundColor: 'white',
-            border: '1px solid #e5e7eb',
-            borderRadius: '0.5rem',
-            padding: '0.75rem',
-            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-          }}
-          labelStyle={{
-            fontWeight: 600,
-            marginBottom: '0.5rem',
-            color: '#111827'
-          }}
-          itemStyle={{
-            padding: '0.25rem 0'
-          }}
-        />
+          <Tooltip
+            formatter={(value: number) => `${value}/20`}
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.5rem',
+              padding: '0.75rem',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+            }}
+            labelStyle={{
+              fontWeight: 600,
+              marginBottom: '0.5rem',
+              color: '#111827'
+            }}
+            itemStyle={{
+              padding: '0.25rem 0'
+            }}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
 
-        <Legend />
-      </RadarChart>
-    </ResponsiveContainer>
+      {/* Custom Interactive Legend */}
+      <div className="flex justify-center gap-6 mt-4">
+        <button
+          onClick={() => toggleTopic('array')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            visibleTopics.array
+              ? 'bg-purple-50 border-2 border-purple-500'
+              : 'bg-gray-100 border-2 border-gray-300 opacity-50'
+          }`}
+        >
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#8b5cf6' }}></div>
+          <span className={`font-medium ${visibleTopics.array ? 'text-purple-700' : 'text-gray-500'}`}>
+            Array
+          </span>
+        </button>
+
+        <button
+          onClick={() => toggleTopic('linkedList')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            visibleTopics.linkedList
+              ? 'bg-pink-50 border-2 border-pink-500'
+              : 'bg-gray-100 border-2 border-gray-300 opacity-50'
+          }`}
+        >
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#ec4899' }}></div>
+          <span className={`font-medium ${visibleTopics.linkedList ? 'text-pink-700' : 'text-gray-500'}`}>
+            Linked List
+          </span>
+        </button>
+
+        <button
+          onClick={() => toggleTopic('stack')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            visibleTopics.stack
+              ? 'bg-green-50 border-2 border-green-500'
+              : 'bg-gray-100 border-2 border-gray-300 opacity-50'
+          }`}
+        >
+          <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
+          <span className={`font-medium ${visibleTopics.stack ? 'text-green-700' : 'text-gray-500'}`}>
+            Stack
+          </span>
+        </button>
+      </div>
+    </>
   )
 }

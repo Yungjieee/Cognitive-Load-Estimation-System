@@ -547,7 +547,7 @@ export default function CalibrationPage() {
         </div>
 
         <div className="mt-12 flex flex-col items-center gap-4">
-          {unifiedSensorStatus === 'offline' && !isChecking && (
+          {/* {unifiedSensorStatus === 'offline' && !isChecking && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-4 max-w-md">
               <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                 <span className="text-lg">⚠️</span>
@@ -557,9 +557,9 @@ export default function CalibrationPage() {
                 </span>
               </div>
             </div>
-          )}
+          )} */}
           
-          {unifiedSensorStatus === 'online' && (
+          {/* {unifiedSensorStatus === 'online' && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 max-w-md">
               <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
                 <span className="text-lg">✅</span>
@@ -568,17 +568,17 @@ export default function CalibrationPage() {
                 </span>
               </div>
             </div>
-          )}
+          )} */}
           
           {/* Debug buttons for troubleshooting */}
-          <div className="flex gap-4 justify-center">
+          {/* <div className="flex gap-4 justify-center">
             <button
               onClick={checkServicesStatus}
               className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline"
             >
               🔍 Check Services Status
             </button>
-          </div>
+          </div> */}
           
           {lastResult && !lastResult.success && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 max-w-md">
@@ -634,13 +634,13 @@ export default function CalibrationPage() {
                         <span className="text-4xl font-bold gradient-text">
                           {environmentNoise}
                         </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ 21</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ 20</span>
                       </div>
 
                       <input
                         type="range"
                         min="0"
-                        max="21"
+                        max="20"
                         step="1"
                         value={environmentNoise}
                         onChange={(e) => setEnvironmentNoise(Number(e.target.value))}
@@ -649,7 +649,7 @@ export default function CalibrationPage() {
 
                       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
                         <span>0 = Very Quiet</span>
-                        <span>21 = Very Noisy</span>
+                        <span>20 = Very Noisy</span>
                       </div>
                     </div>
 

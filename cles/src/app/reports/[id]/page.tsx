@@ -24,6 +24,14 @@ function calculateSessionDuration(startedAt: string, endedAt: string): string {
   return `${diffMins}m ${diffSecs}s`;
 }
 
+// Helper to invert Performance dimension for display (NASA-TLX: lower=better, but confusing to users)
+function getDisplayValue(dimensionKey: string, value: number): number {
+  if (dimensionKey.includes('performance')) {
+    return 20 - value;
+  }
+  return value;
+}
+
 export default function ReportPage() {
   const router = useRouter();
   const params = useParams();
@@ -32,6 +40,7 @@ export default function ReportPage() {
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<number[]>([]);
+  const [dimensionsExpanded, setDimensionsExpanded] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [insightsError, setInsightsError] = useState(false);
@@ -220,7 +229,7 @@ export default function ReportPage() {
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Total Time</div>
             </div>
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-green-50 to-purple-50 dark:from-green-900/20 dark:to-purple-900/20">
-              <div className="text-3xl font-bold gradient-text">{Math.round((report.avgLoad / 21) * 100)}%</div>
+              <div className="text-3xl font-bold gradient-text">{Math.round((report.avgLoad / 20) * 100)}%</div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Avg Cognitive Load</div>
             </div>
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-cyan-50 to-purple-50 dark:from-cyan-900/20 dark:to-purple-900/20">
@@ -246,19 +255,19 @@ export default function ReportPage() {
 
               // Get cognitive load from NASA-TLX system data
               const tlxData = report.nasaTlxSystem?.find((n: any) => n.q_index === index + 1);
-              const cogLoad = tlxData?.cognitive_load || 0; // 0-21 scale
+              const cogLoad = tlxData?.cognitive_load || 0; // 0-20 scale
 
               // Calculate percentage
-              const loadPercentage = Math.round((cogLoad / 21) * 100);
+              const loadPercentage = Math.round((cogLoad / 20) * 100);
 
               // Determine load level
               let loadLevel = 'N/A';
-              if (cogLoad <= 7) loadLevel = 'Low';
-              else if (cogLoad <= 14) loadLevel = 'Medium';
-              else if (cogLoad <= 21) loadLevel = 'High';
+              if (cogLoad <= 6) loadLevel = 'Low';
+              else if (cogLoad <= 13) loadLevel = 'Medium';
+              else if (cogLoad <= 20) loadLevel = 'High';
 
               // Determine bar color based on load level
-              const barColor = cogLoad <= 7 ? 'green' : cogLoad <= 14 ? 'yellow' : 'red';
+              const barColor = cogLoad <= 6 ? 'green' : cogLoad <= 13 ? 'yellow' : 'red';
 
               // Get HRV and convert to stress status
               const hrv = response?.hrv || response?.metrics?.hrv;
@@ -283,7 +292,7 @@ export default function ReportPage() {
                       barColor === 'yellow' ? 'bg-gradient-to-t from-yellow-500 to-yellow-400' :
                       'bg-gradient-to-t from-green-500 to-green-400'
                     }`}
-                    style={{ height: `${(cogLoad / 21) * 150}px` }}
+                    style={{ height: `${(cogLoad / 20) * 150}px` }}
                   />
                   <div className="text-xs mt-3 text-center space-y-1">
                     {/* Question label */}
@@ -354,21 +363,21 @@ export default function ReportPage() {
                     {/* Tooltip */}
                     <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-700/90 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
                       <div className="font-semibold mb-1">System Cognitive Load</div>
-                      <div>Value: {(report.cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/21</div>
-                      <div>Percentage: {Math.round(((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 21) * 100)}%</div>
+                      <div>Value: {(report.cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/20</div>
+                      <div>Percentage: {Math.round(((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 20) * 100)}%</div>
                       <div>Load Level: {(report.cognitiveLoadSummary?.sys_cognitive_load || 0) <= 7 ? 'Low' : (report.cognitiveLoadSummary?.sys_cognitive_load || 0) <= 14 ? 'Medium' : 'High'}</div>
                     </div>
                     {/* Horizontal bar */}
                     <div className="h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden">
                       <div
                         className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-300"
-                        style={{ width: `${((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 21) * 100}%` }}
+                        style={{ width: `${((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 20) * 100}%` }}
                       />
                     </div>
                   </div>
                   <div className="flex items-center gap-3 min-w-[200px]">
                     <span className="text-lg font-bold text-gray-700 dark:text-gray-300">
-                      {Math.round(((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 21) * 100)}%
+                      {Math.round(((report.cognitiveLoadSummary?.sys_cognitive_load || 0) / 20) * 100)}%
                     </span>
                     <span className={`text-xs px-3 py-1 rounded-full font-medium ${
                       (report.cognitiveLoadSummary?.sys_cognitive_load || 0) <= 7
@@ -380,7 +389,7 @@ export default function ReportPage() {
                       {(report.cognitiveLoadSummary?.sys_cognitive_load || 0) <= 7 ? 'Low' : (report.cognitiveLoadSummary?.sys_cognitive_load || 0) <= 14 ? 'Medium' : 'High'}
                     </span>
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {(report.cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/21
+                      {(report.cognitiveLoadSummary?.sys_cognitive_load || 0).toFixed(1)}/20
                     </span>
                   </div>
                 </div>
@@ -393,8 +402,8 @@ export default function ReportPage() {
                     {report.nasaTlxUser?.cognitive_load && (
                       <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-700/90 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
                         <div className="font-semibold mb-1">User Cognitive Load</div>
-                        <div>Value: {report.nasaTlxUser.cognitive_load.toFixed(1)}/21</div>
-                        <div>Percentage: {Math.round((report.nasaTlxUser.cognitive_load / 21) * 100)}%</div>
+                        <div>Value: {report.nasaTlxUser.cognitive_load.toFixed(1)}/20</div>
+                        <div>Percentage: {Math.round((report.nasaTlxUser.cognitive_load / 20) * 100)}%</div>
                         <div>Load Level: {report.nasaTlxUser.cognitive_load <= 7 ? 'Low' : report.nasaTlxUser.cognitive_load <= 14 ? 'Medium' : 'High'}</div>
                       </div>
                     )}
@@ -403,7 +412,7 @@ export default function ReportPage() {
                       {report.nasaTlxUser?.cognitive_load ? (
                         <div
                           className="h-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-300"
-                          style={{ width: `${(report.nasaTlxUser.cognitive_load / 21) * 100}%` }}
+                          style={{ width: `${(report.nasaTlxUser.cognitive_load / 20) * 100}%` }}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-xs text-gray-500 dark:text-gray-400">
@@ -415,7 +424,7 @@ export default function ReportPage() {
                   {report.nasaTlxUser?.cognitive_load ? (
                     <div className="flex items-center gap-3 min-w-[200px]">
                       <span className="text-lg font-bold text-gray-700 dark:text-gray-300">
-                        {Math.round((report.nasaTlxUser.cognitive_load / 21) * 100)}%
+                        {Math.round((report.nasaTlxUser.cognitive_load / 20) * 100)}%
                       </span>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium ${
                         report.nasaTlxUser.cognitive_load <= 7
@@ -427,7 +436,7 @@ export default function ReportPage() {
                         {report.nasaTlxUser.cognitive_load <= 7 ? 'Low' : report.nasaTlxUser.cognitive_load <= 14 ? 'Medium' : 'High'}
                       </span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
-                        {report.nasaTlxUser.cognitive_load.toFixed(1)}/21
+                        {report.nasaTlxUser.cognitive_load.toFixed(1)}/20
                       </span>
                     </div>
                   ) : (
@@ -441,7 +450,7 @@ export default function ReportPage() {
 
             {/* Chart B: 6 Dimensions Grouped Bar Chart */}
             <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl">
-              <h3 className="text-center font-semibold text-lg mb-6 text-gray-900 dark:text-white">By Dimension</h3>
+              <h3 className="text-center font-semibold text-lg mb-6 text-gray-900 dark:text-white">By Cognitive Load Dimensions</h3>
 
               {/* Legend */}
               <div className="flex items-center justify-center gap-8 mb-8">
@@ -460,13 +469,13 @@ export default function ReportPage() {
                 {[
                   { name: 'Mental', abbr: 'MD', sys: 'sys_mental_demand', user: 'mental_demand' },
                   { name: 'Physical', abbr: 'PD', sys: 'sys_physical_demand', user: 'physical_demand' },
-                  { name: 'Temporal', abbr: 'TD', sys: 'sys_temporal_demand', user: 'temporal_demand' },
-                  { name: 'Performance', abbr: 'Perf', sys: 'sys_performance', user: 'performance' },
+                  { name: 'Time Pressure', abbr: 'TD', sys: 'sys_temporal_demand', user: 'temporal_demand' },
+                  { name: 'Task Success', abbr: 'Perf', sys: 'sys_performance', user: 'performance' },
                   { name: 'Effort', abbr: 'Eff', sys: 'sys_effort', user: 'effort' },
                   { name: 'Frustration', abbr: 'Frust', sys: 'sys_frustration', user: 'frustration' }
                 ].map((dim, index) => {
-                  const systemValue = report.cognitiveLoadSummary?.[dim.sys] || 0;
-                  const userValue = report.nasaTlxUser?.[dim.user] || 0;
+                  const systemValue = getDisplayValue(dim.sys, report.cognitiveLoadSummary?.[dim.sys] || 0);
+                  const userValue = getDisplayValue(dim.user, report.nasaTlxUser?.[dim.user] || 0);
 
                   return (
                     <div key={index} className="flex flex-col items-center">
@@ -475,13 +484,16 @@ export default function ReportPage() {
                         {/* System bar */}
                         <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
                           {systemValue > 0 && (
-                            <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
-                              {systemValue.toFixed(1)}
+                            <div
+                              className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap cursor-help"
+                              title={`Raw score: ${systemValue.toFixed(1)}/20`}
+                            >
+                              {Math.round((systemValue / 20) * 100)}%
                             </div>
                           )}
                           <div
                             className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-300"
-                            style={{ height: `${Math.max((systemValue / 21) * 240, systemValue > 0 ? 10 : 0)}px` }}
+                            style={{ height: `${Math.max((systemValue / 20) * 240, systemValue > 0 ? 10 : 0)}px` }}
                             title={`System ${dim.name}: ${systemValue.toFixed(1)}`}
                           />
                         </div>
@@ -490,12 +502,15 @@ export default function ReportPage() {
                         <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
                           {userValue > 0 ? (
                             <>
-                              <div className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap">
-                                {userValue.toFixed(1)}
+                              <div
+                                className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap cursor-help"
+                                title={`Raw score: ${userValue.toFixed(1)}/20`}
+                              >
+                                {Math.round((userValue / 20) * 100)}%
                               </div>
                               <div
                                 className="w-full bg-gradient-to-t from-orange-500 to-orange-400 rounded-t transition-all duration-300"
-                                style={{ height: `${Math.max((userValue / 21) * 240, 10)}px` }}
+                                style={{ height: `${Math.max((userValue / 20) * 240, 10)}px` }}
                                 title={`User ${dim.name}: ${userValue.toFixed(1)}`}
                               />
                             </>
@@ -516,10 +531,58 @@ export default function ReportPage() {
 
               {/* Y-axis label */}
               <div className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
-                Scale: 0-21
+                Scale: 0-20
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Dimension Explanations */}
+        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
+          <button
+            onClick={() => setDimensionsExpanded(!dimensionsExpanded)}
+            className="w-full flex items-center gap-3 mb-4 hover:opacity-80 transition-opacity"
+          >
+            <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">📊</span>
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white flex-1 text-left">Understanding Cognitive Load Dimensions</h2>
+            <span className="text-gray-500 dark:text-gray-400 text-xl">{dimensionsExpanded ? '▼' : '▶'}</span>
+          </button>
+
+          {dimensionsExpanded && (
+            <div className="mt-4 space-y-4">
+              <p className="text-gray-600 dark:text-gray-300">
+                Your cognitive load is measured across six key dimensions (scale: 0-20, where higher values indicate greater load):
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Mental Demand</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How much mental effort was required for thinking, deciding, and problem-solving.</p>
+                </div>
+                <div className="border-l-4 border-green-500 pl-4 bg-green-50/50 dark:bg-green-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Physical Demand</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How distracting was your environment? Was it noisy, uncomfortable, or did people interrupt you?</p>
+                </div>
+                <div className="border-l-4 border-yellow-500 pl-4 bg-yellow-50/50 dark:bg-yellow-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Time Pressure</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How much time pressure you felt while completing the tasks.</p>
+                </div>
+                <div className="border-l-4 border-purple-500 pl-4 bg-purple-50/50 dark:bg-purple-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Task Success</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-purple-700 dark:text-purple-300">(Higher scores = better performance)</span></p>
+                </div>
+                <div className="border-l-4 border-orange-500 pl-4 bg-orange-50/50 dark:bg-orange-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Effort</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How hard you had to work (mentally and physically) to achieve your level of performance.</p>
+                </div>
+                <div className="border-l-4 border-red-500 pl-4 bg-red-50/50 dark:bg-red-900/10 py-3 rounded-r">
+                  <h3 className="font-semibold text-gray-800 dark:text-gray-200">Frustration</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How discouraged, stressed, or annoyed you felt during the tasks.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section 4: Per-Question Detail Cards */}
@@ -534,8 +597,8 @@ export default function ReportPage() {
             {report.responses.map((response: any) => {
               const tlxData = report.nasaTlxSystem?.find((n: any) => n.q_index === response.q_index);
               const cogLoad = tlxData?.cognitive_load || 0;
-              const loadPercentage = Math.round((cogLoad / 21) * 100);
-              const loadLevel = cogLoad <= 7 ? 'Low' : cogLoad <= 14 ? 'Medium' : 'High';
+              const loadPercentage = Math.round((cogLoad / 20) * 100);
+              const loadLevel = cogLoad <= 6 ? 'Low' : cogLoad <= 13 ? 'Medium' : 'High';
               const isSkipped = response.metrics?.skipped === true;
               const pointsAwarded = response.metrics?.pointsAwarded || 0;
               const exampleShown = (response.metrics?.examplePenalty || 0) > 0;
@@ -594,7 +657,7 @@ export default function ReportPage() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <div className="text-lg font-bold text-gray-700 dark:text-gray-300">{loadPercentage}%</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{cogLoad.toFixed(1)}/21</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{cogLoad.toFixed(1)}/20</div>
                       </div>
                       <span className={`text-xs px-3 py-1 rounded-full font-medium ${
                         loadLevel === 'Low' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
@@ -613,19 +676,18 @@ export default function ReportPage() {
                           {[
                             { name: 'Mental Demand', field: 'mental_demand' },
                             { name: 'Physical Demand', field: 'physical_demand' },
-                            { name: 'Temporal Demand', field: 'temporal_demand' },
-                            { name: 'Performance', field: 'performance' },
+                            { name: 'Time Pressure', field: 'temporal_demand' },
+                            { name: 'Task Success', field: 'performance' },
                             { name: 'Effort', field: 'effort' },
                             { name: 'Frustration', field: 'frustration' }
                           ].map((dim) => {
-                            const value = tlxData?.[dim.field] || 0;
-                            const percentage = (value / 21) * 100;
+                            const value = getDisplayValue(dim.field, tlxData?.[dim.field] || 0);
+                            const percentage = (value / 20) * 100;
 
-                            const barColor = value <= 7
-                              ? 'from-green-500 to-green-400'
-                              : value <= 14
-                              ? 'from-yellow-500 to-yellow-400'
-                              : 'from-red-500 to-red-400';
+                            // Color logic: For Performance (inverted), higher=better=green. For others, lower=better=green
+                            const barColor = dim.field.includes('performance')
+                              ? (value >= 14 ? 'from-green-500 to-green-400' : value >= 7 ? 'from-yellow-500 to-yellow-400' : 'from-red-500 to-red-400')
+                              : (value <= 6 ? 'from-green-500 to-green-400' : value <= 13 ? 'from-yellow-500 to-yellow-400' : 'from-red-500 to-red-400');
 
                             return (
                               <div key={dim.field} className="flex items-center gap-3">
@@ -636,8 +698,11 @@ export default function ReportPage() {
                                     style={{ width: `${Math.max(percentage, value > 0 ? 5 : 0)}%` }}
                                   />
                                 </div>
-                                <div className="w-16 text-sm text-right text-gray-600 dark:text-gray-400">
-                                  {value.toFixed(1)}/21
+                                <div
+                                  className="w-16 text-sm text-right text-gray-600 dark:text-gray-400 cursor-help"
+                                  title={`Raw score: ${value.toFixed(1)}/20`}
+                                >
+                                  {Math.round((value / 20) * 100)}%
                                 </div>
                               </div>
                             );
@@ -780,7 +845,7 @@ export default function ReportPage() {
                       {lowAttentionCount}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Low Attention Questions
+                      Number of Low Attention Questions
                     </div>
                   </div>
 
@@ -791,7 +856,7 @@ export default function ReportPage() {
                       {highStressCount}
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400">
-                      High Stress Questions
+                      Number of Stressful Questions
                     </div>
                   </div>
                 </>
