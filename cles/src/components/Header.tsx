@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -62,9 +63,13 @@ export default function Header() {
       <header className="w-full border-b border-purple-200/30 dark:border-purple-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gray-900/80 sticky top-0 z-50">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
           <a href="/" className="flex items-center gap-3 font-bold text-xl">
-            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
+            <Image
+              src="/logo.png"
+              alt="CLES Logo"
+              width={40}
+              height={40}
+              className="rounded-lg"
+            />
             <span className="gradient-text">CLES</span>
           </a>
           <div className="flex items-center gap-3">
@@ -79,9 +84,13 @@ export default function Header() {
     <header className="w-full border-b border-purple-200/30 dark:border-purple-800/30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-gray-900/80 sticky top-0 z-50">
       <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
         <a href={user ? "/home" : "/"} className="flex items-center gap-3 font-bold text-xl">
-          <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">C</span>
-          </div>
+          <Image
+            src="/logo.png"
+            alt="CLES Logo"
+            width={40}
+            height={40}
+            className="rounded-lg"
+          />
           <span className="gradient-text">CLES</span>
         </a>
         

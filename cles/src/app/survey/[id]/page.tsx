@@ -41,18 +41,28 @@ export default function SurveyPage() {
     try {
       const sessionId = Number(params.id)
 
-      // 1. Calculate user cognitive load
-      const userCognitiveLoad = calculateUserCognitiveLoad(ratings)
+      // Convert 0-10 scale to 0-20 scale for backend storage
+      const convertedRatings = {
+        mental_demand: ratings.mental_demand * 2,
+        physical_demand: ratings.physical_demand * 2,
+        temporal_demand: ratings.temporal_demand * 2,
+        performance: ratings.performance * 2,
+        effort: ratings.effort * 2,
+        frustration: ratings.frustration * 2
+      }
 
-      // 2. Save user survey ratings
+      // 1. Calculate user cognitive load using converted values
+      const userCognitiveLoad = calculateUserCognitiveLoad(convertedRatings)
+
+      // 2. Save user survey ratings (converted to 0-20 scale)
       await DatabaseClient.createNasaTlxUser({
         session_id: sessionId,
-        mental_demand: ratings.mental_demand,
-        physical_demand: ratings.physical_demand,
-        temporal_demand: ratings.temporal_demand,
-        performance: ratings.performance,
-        effort: ratings.effort,
-        frustration: ratings.frustration,
+        mental_demand: convertedRatings.mental_demand,
+        physical_demand: convertedRatings.physical_demand,
+        temporal_demand: convertedRatings.temporal_demand,
+        performance: convertedRatings.performance,
+        effort: convertedRatings.effort,
+        frustration: convertedRatings.frustration,
         cognitive_load: userCognitiveLoad
       })
 
@@ -137,14 +147,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.mental_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.mental_demand}
               onChange={(e) => {
@@ -156,10 +166,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -183,14 +194,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.physical_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.physical_demand}
               onChange={(e) => {
@@ -202,10 +213,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -229,14 +241,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.temporal_demand}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.temporal_demand}
               onChange={(e) => {
@@ -248,10 +260,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -271,21 +284,21 @@ export default function SurveyPage() {
                 How well did you do? Did you complete the task successfully or struggle with it?
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-1">
-                (0 = perfect, 20 = failure)
+                (0 = perfect, 10 = failure)
               </p>
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.performance}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.performance}
               onChange={(e) => {
@@ -297,10 +310,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -324,14 +338,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.effort}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.effort}
               onChange={(e) => {
@@ -343,10 +357,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -370,14 +385,14 @@ export default function SurveyPage() {
               <div className="text-3xl font-bold text-purple-600">
                 {ratings.frustration}
               </div>
-              <div className="text-xs text-gray-500">/ 20</div>
+              <div className="text-xs text-gray-500">/ 10</div>
             </div>
           </div>
           <div className="relative">
             <input
               type="range"
               min="0"
-              max="20"
+              max="10"
               step="1"
               value={ratings.frustration}
               onChange={(e) => {
@@ -389,10 +404,11 @@ export default function SurveyPage() {
             {/* Scale markers */}
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
               <span>0</span>
-              <span>5</span>
+              <span>2</span>
+              <span>4</span>
+              <span>6</span>
+              <span>8</span>
               <span>10</span>
-              <span>15</span>
-              <span>20</span>
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">

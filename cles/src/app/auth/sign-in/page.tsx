@@ -31,7 +31,20 @@ export default function SignInPage() {
       if (data.user) {
         // Dispatch custom event to update header
         window.dispatchEvent(new CustomEvent('userUpdated'));
-        router.push("/home");
+
+        // Check user role to determine redirect
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', data.user.id)
+          .single();
+
+        // Redirect based on role
+        if (userData?.role === 'admin') {
+          router.push("/admin");
+        } else {
+          router.push("/home");
+        }
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred');

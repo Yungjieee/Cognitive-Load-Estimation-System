@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { DatabaseClient } from "@/lib/database";
 import { supabase } from "@/lib/supabase";
 import type { Subtopic as DBSubtopic, Session } from "@/lib/database";
@@ -42,6 +43,7 @@ function isSubtopicLocked(subtopic: DBSubtopic): boolean {
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [recentReports, setRecentReports] = useState<Session[]>([]);
   const [subtopics, setSubtopics] = useState<DBSubtopic[]>([]);
@@ -127,6 +129,19 @@ export default function HomePage() {
   }, []);
 
   // Profile completion is now managed by state
+
+  function handleStartLearning(subtopicKey: string) {
+    if (!profileCompleted) {
+      const confirmed = confirm(
+        "Please complete your profile before starting. Would you like to go to your profile now?"
+      );
+      if (confirmed) {
+        router.push(`/profile?return=/home`);
+      }
+      return;
+    }
+    router.push(`/calibration?subtopic=${subtopicKey}`);
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -214,20 +229,21 @@ export default function HomePage() {
                             View Details
                           </a>
                           <button
-                            aria-disabled={!canStart}
+                            onClick={() => handleStartLearning(s.key)}
+                            disabled={!canStart}
                             className={`text-sm rounded-xl px-4 py-2 font-medium transition-all duration-300 ${
                               canStart
-                                ? "btn-primary text-white shadow-lg hover:shadow-xl" 
+                                ? "btn-primary text-white shadow-lg hover:shadow-xl"
                                 : "bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
                             }`}
                             title={
-                              !isClient || !profileCompleted 
-                                ? "Complete profile first" 
+                              !isClient || !profileCompleted
+                                ? "Complete profile first"
                                 : "Start learning"
                             }
                           >
-                            {!isClient || !profileCompleted 
-                              ? "Complete Profile First" 
+                            {!isClient || !profileCompleted
+                              ? "Complete Profile First"
                               : "Start Learning"
                             }
                           </button>

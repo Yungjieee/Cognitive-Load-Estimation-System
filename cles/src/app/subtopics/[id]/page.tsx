@@ -65,11 +65,12 @@ export default function SubtopicDetailsPage() {
     };
     
     loadUser();
-    
-    // Redirect locked subtopics to home with toast
+
+    // Redirect locked subtopics to home with popup message
     if (isSubtopicLocked(subtopicId)) {
+      const subtopicName = SUBTOPICS[subtopicId as keyof typeof SUBTOPICS]?.name || 'This topic';
+      alert(`${subtopicName} is currently locked. Complete available topics first!`);
       router.push('/home');
-      // Note: In a real app, you'd show a toast notification here
       return;
     }
   }, [subtopicId, router]);

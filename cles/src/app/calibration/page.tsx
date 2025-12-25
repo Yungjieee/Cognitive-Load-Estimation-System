@@ -19,7 +19,7 @@ export default function CalibrationPage() {
   const [faceStable, setFaceStable] = useState(false);
   const [attentionStatus, setAttentionStatus] = useState<'FOCUSED' | 'DISTRACTED'>('DISTRACTED');
   const [countdown, setCountdown] = useState(10);
-  const [calibrationPassed, setCalibrationPassed] = useState(false);
+  const [calibrationPassed, setCalibrationPassed] = useState(false); // Temporarily set to true for testing
   const [calibrating, setCalibrating] = useState(false);
   const [rmssdBaseline, setRmssdBaseline] = useState<number | null>(null);
   const rmssdCalculatedRef = useRef(false); // Track if RMSSD has been calculated
@@ -28,8 +28,8 @@ export default function CalibrationPage() {
   const [dbSessionId, setDbSessionId] = useState<number | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [mode, setMode] = useState<'support' | 'no_support'>('support');
-  const [showEnvironmentModal, setShowEnvironmentModal] = useState(false);
-  const [environmentNoise, setEnvironmentNoise] = useState(10); // Default to middle value
+  const [showEnvironmentModal, setShowEnvironmentModal] = useState(false); // Temporarily set to true for testing
+  const [environmentNoise, setEnvironmentNoise] = useState(5); // Default to middle value (0-10 scale)
 
   // Sensor connection status
   const { sensorStatus, isConnected, isOnline, isChecking, hasError } = useSensorConnection();
@@ -367,9 +367,11 @@ export default function CalibrationPage() {
     }
 
     try {
-      console.log(`💾 Saving environment noise rating: ${environmentNoise} for session ${dbSessionId}`);
+      // Convert 0-10 scale to 0-20 scale for backend storage
+      const convertedEnvironmentNoise = environmentNoise * 2;
+      console.log(`💾 Saving environment noise rating: ${environmentNoise} (0-10) → ${convertedEnvironmentNoise} (0-20) for session ${dbSessionId}`);
       await DatabaseClient.updateSession(dbSessionId.toString(), {
-        environment_noise: environmentNoise
+        environment_noise: convertedEnvironmentNoise
       });
       console.log('✅ Environment noise saved successfully');
       setShowEnvironmentModal(false);
@@ -380,17 +382,17 @@ export default function CalibrationPage() {
   }
 
   // Debug function to check services status
-  const checkServicesStatus = async () => {
-    try {
-      const response = await fetch('/api/services/status');
-      const data = await response.json();
-      console.log('🔍 Services status:', data);
-      alert(`Services Status:\nWebSocket: ${data.websocket.running ? 'Running' : 'Not Running'}\nPort: ${data.websocket.port}\nMessage: ${data.websocket.message}`);
-    } catch (error) {
-      console.error('Failed to check services status:', error);
-      alert('Failed to check services status');
-    }
-  };
+  // const checkServicesStatus = async () => {
+  //   try {
+  //     const response = await fetch('/api/services/status');
+  //     const data = await response.json();
+  //     console.log('🔍 Services status:', data);
+  //     alert(`Services Status:\nWebSocket: ${data.websocket.running ? 'Running' : 'Not Running'}\nPort: ${data.websocket.port}\nMessage: ${data.websocket.message}`);
+  //   } catch (error) {
+  //     console.error('Failed to check services status:', error);
+  //     alert('Failed to check services status');
+  //   }
+  // };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -634,22 +636,32 @@ export default function CalibrationPage() {
                         <span className="text-4xl font-bold gradient-text">
                           {environmentNoise}
                         </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ 20</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">/ 10</span>
                       </div>
 
                       <input
                         type="range"
                         min="0"
-                        max="20"
+                        max="10"
                         step="1"
                         value={environmentNoise}
                         onChange={(e) => setEnvironmentNoise(Number(e.target.value))}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-purple-600"
                       />
 
+                      {/* Scale markers */}
+                      <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mt-1 px-1">
+                        <span>0</span>
+                        <span>2</span>
+                        <span>4</span>
+                        <span>6</span>
+                        <span>8</span>
+                        <span>10</span>
+                      </div>
+
                       <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-                        <span>0 = Very Quiet</span>
-                        <span>20 = Very Noisy</span>
+                        <span>Very Quiet</span>
+                        <span>Very Noisy</span>
                       </div>
                     </div>
 

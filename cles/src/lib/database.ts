@@ -16,6 +16,7 @@ export interface User {
   profile_math_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken' | null
   profile_programming_grade?: 'A' | 'B' | 'C' | 'D' | 'F' | 'not_taken' | null
   settings_mode: 'support' | 'no_support'
+  role?: 'user' | 'admin'
 }
 
 export interface Subtopic {
@@ -233,13 +234,14 @@ export class DatabaseClient {
       const client: any = (supabaseAdmin as unknown as object) ?? supabase;
       const { error: insertError } = await client
         .from('users')
-        .insert([{ 
-          id: userId, 
-          email, 
-          profile_completed: false, 
+        .insert([{
+          id: userId,
+          email,
+          profile_completed: false,
           profile_prior_knowledge: {},
           profile_interest_subtopics: [],
-          settings_mode: 'support'
+          settings_mode: 'support',
+          role: 'user'
         }]);
       if (insertError) throw insertError;
     }
@@ -337,7 +339,8 @@ export class DatabaseClient {
         profile_experience_taken_course: null,
         profile_experience_hands_on: null,
         profile_interest_subtopics: [],
-        settings_mode: 'support'
+        settings_mode: 'support',
+        role: 'user'
       }])
       .select()
       .single()

@@ -471,7 +471,7 @@ export default function SessionPage() {
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-300">Time remaining</div>
               <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                Score: {Number(sessionState.totalScore.toFixed(1))}
+                Score: {Number(sessionState.totalScore.toFixed(2))}
               </div>
             </div>
           </div>
@@ -505,7 +505,7 @@ export default function SessionPage() {
             <div className="flex items-center gap-2">
               <span className="text-green-600 dark:text-green-400 text-lg">⏰</span>
               <span className="text-green-800 dark:text-green-200 font-semibold">
-                Extra time granted: +{sessionState.extraTimeAdded}s (-2 points)
+                Extra time granted: +{sessionState.extraTimeAdded}s (-0.01 points)
               </span>
             </div>
           </div>

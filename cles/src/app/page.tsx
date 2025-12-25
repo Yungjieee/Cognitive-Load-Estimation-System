@@ -50,7 +50,7 @@ export default function Home() {
               <span className="text-gray-900 dark:text-white">with Smart Monitoring</span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto mb-8 leading-relaxed">
-              Practice 10-question Data Structures tasks while our AI estimates your cognitive load using
+              Practice 5-question Data Structures tasks while our AI estimates your cognitive load using
               webcam attention tracking and heart-rate monitoring. Get personalized insights and downloadable reports.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
@@ -65,7 +65,7 @@ export default function Home() {
             {/* Stats */}
             <div className="grid grid-cols-3 gap-8 max-w-md mx-auto">
               <div className="text-center">
-                <div className="text-3xl font-bold gradient-text">10</div>
+                <div className="text-3xl font-bold gradient-text">5</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">Questions</div>
               </div>
               <div className="text-center">
@@ -138,7 +138,7 @@ export default function Home() {
           </h2>
           <p className="text-xl text-gray-600 dark:text-gray-300 leading-relaxed mb-8">
             CLES focuses on Data Structures mastery with six core topics: Array, Linked List, Stack, Queue, Tree, and Sorting. 
-            Each session consists of exactly 10 questions designed to challenge and improve your understanding.
+            Each session consists of exactly 5 questions designed to challenge and improve your understanding.
           </p>
           <div className="grid md:grid-cols-2 gap-8 mt-12">
             <div className="bg-white/50 dark:bg-gray-800/50 rounded-2xl p-6 backdrop-blur-sm">

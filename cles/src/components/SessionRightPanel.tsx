@@ -169,7 +169,7 @@ export default function SessionRightPanel({
       </div>
 
       {/* Cognitive Load Panel */}
-      <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+      {/* <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
             <span className="text-white text-xs">🧠</span>
@@ -183,7 +183,7 @@ export default function SessionRightPanel({
           {renderLoadBar('Extraneous', cognitiveLoad.extraneous, 'bg-gradient-to-r from-yellow-500 to-orange-500')}
           {renderLoadBar('Germane', cognitiveLoad.germane, 'bg-gradient-to-r from-green-500 to-emerald-500')}
         </div>
-      </div>
+      </div> */}
 
       {/* Stream Health */}
       {!streamStatus.webcam.active ? (

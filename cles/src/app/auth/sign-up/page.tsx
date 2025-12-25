@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { DatabaseClient } from "@/lib/database";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -29,6 +30,15 @@ export default function SignUpPage() {
       }
 
       if (data.user) {
+        // Ensure user record exists in public.users table
+        try {
+          await DatabaseClient.ensureUserRecord(data.user.id, data.user.email!);
+        } catch (dbError) {
+          console.error('Failed to create user record in database:', dbError);
+          // Continue anyway - user can still access the app
+          // The ensureUserRecord will be called again when they navigate
+        }
+
         // Dispatch custom event to update header
         window.dispatchEvent(new CustomEvent('userUpdated'));
         router.push("/home");

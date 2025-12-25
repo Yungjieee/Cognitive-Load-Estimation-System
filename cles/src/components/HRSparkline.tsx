@@ -21,7 +21,7 @@ export default function HRSparkline({ sessionId, isActive, className = '' }: HRS
   const maxDataPoints = 100; // Keep last 100 data points for sparkline
   
   // Use real-time updates from ESP32
-  const { currentBPM, isConnected } = useRealtimeUpdates(sessionId);
+  const { currentBPM, isConnected, sensorStatus } = useRealtimeUpdates(sessionId);
 
   // Handle real-time HR data updates
   useEffect(() => {
@@ -138,9 +138,9 @@ export default function HRSparkline({ sessionId, isActive, className = '' }: HRS
           {currentBPM ? `${currentBPM} BPM` : '-- BPM'}
         </div>
         <div className={`text-xs ${
-          isConnected ? 'text-green-600' : 'text-gray-400'
+          sensorStatus === 'online' ? 'text-green-600' : 'text-gray-400'
         }`}>
-          {isConnected ? 'Connected' : 'Disconnected'}
+          {sensorStatus === 'online' ? 'Connected' : 'Disconnected'}
         </div>
       </div>
     </div>

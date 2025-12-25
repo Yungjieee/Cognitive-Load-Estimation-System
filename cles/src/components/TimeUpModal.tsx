@@ -52,7 +52,7 @@ export default function TimeUpModal({
             disabled={extraTimeUsed}
             className="w-full rounded-xl px-6 py-3 bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {extraTimeUsed ? 'Extra Time Already Used' : `Request Extra Time (+70% time, -0.1 pt)`}
+            {extraTimeUsed ? 'Extra Time Already Used' : `Request Extra Time (+70% time, -0.01 pt)`}
           </button>
           
           <button
