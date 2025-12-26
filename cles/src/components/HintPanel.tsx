@@ -10,13 +10,15 @@ interface HintPanelProps {
   hintsUsed: number;
   onUseHint: (type: 'hint' | 'example') => void;
   disabled?: boolean;
+  shouldGlow?: boolean;
 }
 
-export default function HintPanel({ 
-  question, 
-  hintsUsed, 
-  onUseHint, 
-  disabled = false 
+export default function HintPanel({
+  question,
+  hintsUsed,
+  onUseHint,
+  disabled = false,
+  shouldGlow = false
 }: HintPanelProps) {
   const [showHint1, setShowHint1] = useState(false);
   const [showHint2, setShowHint2] = useState(false);
@@ -74,7 +76,11 @@ export default function HintPanel({
   };
 
   return (
-    <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
+    <div className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 shadow-lg transition-all duration-500 ${
+      shouldGlow
+        ? 'border-2 border-purple-400 dark:border-purple-500 shadow-purple-500/50 dark:shadow-purple-400/50 shadow-2xl animate-pulse'
+        : 'border border-purple-200/30 dark:border-purple-800/30'
+    }`}>
       <div className="flex items-center gap-2 mb-4">
         <div className="w-6 h-6 rounded-lg gradient-bg flex items-center justify-center">
           <span className="text-white text-xs">💡</span>

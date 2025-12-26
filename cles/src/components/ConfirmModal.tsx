@@ -9,6 +9,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   variant?: 'danger' | 'warning' | 'info';
+  isLoading?: boolean;
 }
 
 export default function ConfirmModal({
@@ -19,7 +20,8 @@ export default function ConfirmModal({
   cancelText = "Cancel",
   onConfirm,
   onCancel,
-  variant = 'warning'
+  variant = 'warning',
+  isLoading = false
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
@@ -76,14 +78,23 @@ export default function ConfirmModal({
         <div className="space-y-3">
           <button
             onClick={onConfirm}
-            className={`w-full rounded-xl px-6 py-3 ${styles.confirmBg} ${styles.confirmText} font-semibold transition-colors`}
+            disabled={isLoading}
+            className={`w-full rounded-xl px-6 py-3 ${styles.confirmBg} ${styles.confirmText} font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed`}
           >
-            {confirmText}
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span>Processing...</span>
+              </div>
+            ) : (
+              confirmText
+            )}
           </button>
-          
+
           <button
             onClick={onCancel}
-            className="w-full rounded-xl px-6 py-3 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+            disabled={isLoading}
+            className="w-full rounded-xl px-6 py-3 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {cancelText}
           </button>

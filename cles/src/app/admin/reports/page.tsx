@@ -223,12 +223,15 @@ export default function AdminReportsPage() {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-purple-100 dark:divide-gray-700">
               {filteredSessions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                     No reports found
                   </td>
                 </tr>
@@ -236,8 +239,7 @@ export default function AdminReportsPage() {
                 filteredSessions.map((session) => (
                   <tr
                     key={session.id}
-                    onClick={() => router.push(`/admin/reports/${session.id}`)}
-                    className="hover:bg-purple-50/50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    className="hover:bg-purple-50/50 dark:hover:bg-gray-700/50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -283,6 +285,19 @@ export default function AdminReportsPage() {
                       >
                         {session.ended_at ? 'Completed' : 'In Progress'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {/* View button - icon only */}
+                      <button
+                        onClick={() => router.push(`/admin/reports/${session.id}`)}
+                        className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                        title="View report details"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 ))

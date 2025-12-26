@@ -42,11 +42,12 @@ export default function SurveyPage() {
       const sessionId = Number(params.id)
 
       // Convert 0-10 scale to 0-20 scale for backend storage
+      // Performance is inverted (10 = perfect becomes 0 in database)
       const convertedRatings = {
         mental_demand: ratings.mental_demand * 2,
         physical_demand: ratings.physical_demand * 2,
         temporal_demand: ratings.temporal_demand * 2,
-        performance: ratings.performance * 2,
+        performance: (10 - ratings.performance) * 2, // Invert: user's 10 (perfect) → database 0
         effort: ratings.effort * 2,
         frustration: ratings.frustration * 2
       }
@@ -284,7 +285,7 @@ export default function SurveyPage() {
                 How well did you do? Did you complete the task successfully or struggle with it?
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 italic mt-1">
-                (0 = perfect, 10 = failure)
+                (0 = failure , 10 = perfect)
               </p>
             </div>
             <div className="text-right">
@@ -318,8 +319,8 @@ export default function SurveyPage() {
             </div>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-2">
-            <span>Perfect</span>
             <span>Failure</span>
+            <span>Perfect</span>
           </div>
         </div>
 

@@ -29,6 +29,9 @@ export default function SessionPage() {
   const [currentAnswer, setCurrentAnswer] = useState<Answer | null>(null);
   const [showTenSecondWarning, setShowTenSecondWarning] = useState(false);
   const [dbSessionId, setDbSessionId] = useState<number | null>(null);
+  const [hintPanelShouldGlow, setHintPanelShouldGlow] = useState(false);
+  const [lastHintInteractionTime, setLastHintInteractionTime] = useState<number>(0);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   // ESP32 device commands
   const { sendCommand, stopSession } = useDeviceCommands();
@@ -82,6 +85,64 @@ export default function SessionPage() {
       setShowTenSecondWarning(false);
     }
   }, [sessionState?.timeRemaining]);
+
+  // Handle hint panel glow
+  useEffect(() => {
+    if (!sessionState || sessionState.showReveal || sessionState.isPaused || mode === 'no_support') {
+      setHintPanelShouldGlow(false);
+      return;
+    }
+
+    const currentQuestion = sessionState.questions[sessionState.currentQuestionIndex];
+    const elapsedTime = sessionState.originalTimeLimit - sessionState.timeRemaining;
+    const hintsUsed = sessionState.hintsUsed[sessionState.currentQuestionIndex];
+    const exampleUsed = sessionState.exampleUsed[sessionState.currentQuestionIndex];
+
+    // Stop if all hints exhausted
+    if (hintsUsed >= 3 && exampleUsed) {
+      setHintPanelShouldGlow(false);
+      return;
+    }
+
+    // Initial threshold based on difficulty (1=Easy, 3=Medium, 5=Hard)
+    let initialThreshold: number;
+    if (currentQuestion.difficulty === 1) {
+      initialThreshold = 15; // Easy: 15 seconds
+    } else if (currentQuestion.difficulty === 5) {
+      initialThreshold = 30; // Hard: 30 seconds
+    } else {
+      initialThreshold = 20; // Medium: 20 seconds
+    }
+
+    // Re-glow threshold after hint interaction (shorter)
+    const reglowThreshold = 10; // seconds after last hint
+
+    const timeSinceLastHint = elapsedTime - lastHintInteractionTime;
+
+    // Glow if:
+    // 1. Past initial threshold for first hint, OR
+    // 2. Past re-glow threshold after using hints (and more hints available)
+    const shouldGlow =
+      (hintsUsed === 0 && elapsedTime >= initialThreshold) ||
+      (hintsUsed > 0 && timeSinceLastHint >= reglowThreshold);
+
+    setHintPanelShouldGlow(shouldGlow);
+  }, [
+    sessionState?.timeRemaining,
+    sessionState?.currentQuestionIndex,
+    sessionState?.hintsUsed,
+    sessionState?.exampleUsed,
+    sessionState?.showReveal,
+    sessionState?.isPaused,
+    lastHintInteractionTime,
+    mode
+  ]);
+
+  // Reset glow state when question changes
+  useEffect(() => {
+    setLastHintInteractionTime(0);
+    setHintPanelShouldGlow(false);
+  }, [sessionState?.currentQuestionIndex]);
 
   // Handle session completion
   useEffect(() => {
@@ -338,7 +399,9 @@ export default function SessionPage() {
   }
 
   async function handleConfirmSkip() {
+    setIsSkipping(true);
     await sessionEngine.skipQuestion();
+    setIsSkipping(false);
   }
 
   function handleCancelSkip() {
@@ -350,6 +413,10 @@ export default function SessionPage() {
   }
 
   function handleUseHint(type: 'hint' | 'example') {
+    if (sessionState) {
+      const elapsedTime = sessionState.originalTimeLimit - sessionState.timeRemaining;
+      setLastHintInteractionTime(elapsedTime);
+    }
     sessionEngine.useHint(type);
   }
 
@@ -571,6 +638,7 @@ export default function SessionPage() {
                 hintsUsed={sessionState.hintsUsed[sessionState.currentQuestionIndex]}
                 onUseHint={handleUseHint}
                 disabled={sessionState.isPaused}
+                shouldGlow={hintPanelShouldGlow}
               />
             ) : (
               <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
@@ -624,6 +692,7 @@ export default function SessionPage() {
           onConfirm={handleConfirmSkip}
           onCancel={handleCancelSkip}
           variant="warning"
+          isLoading={isSkipping}
         />
       )}
     </div>

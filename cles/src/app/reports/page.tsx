@@ -38,18 +38,27 @@ export default function ReportsPage() {
         
         if (currentUser) {
           const sessions = await DatabaseClient.getSessionsByUser(currentUser.id);
-          const reportItems = sessions
+
+          // Fetch cognitive load for each completed session
+          const reportItemsPromises = sessions
             .filter(session => session.ended_at)
-            .map(session => ({
-              id: String(session.id),
-              date: formatDate(session.started_at),
-              subtopic: session.subtopics?.name || 'Unknown',
-              mode: session.mode as "support" | "no_support",
-              score: session.score_total || 0,
-              avgLoad: 0.5, // TODO: Calculate from responses
-            }))
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setReports(reportItems);
+            .map(async (session) => {
+              // Fetch cognitive load summary for this session
+              const cognitiveLoadSummary = await DatabaseClient.getSessionCognitiveLoadSummary(String(session.id));
+
+              return {
+                id: String(session.id),
+                date: formatDate(session.started_at),
+                subtopic: session.subtopics?.name || 'Unknown',
+                mode: session.mode as "support" | "no_support",
+                score: session.score_total || 0,
+                avgLoad: (cognitiveLoadSummary?.sys_cognitive_load || 0) / 20, // Convert 0-20 scale to 0-1 for percentage
+              };
+            });
+
+          const reportItems = await Promise.all(reportItemsPromises);
+          const sortedReports = reportItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setReports(sortedReports);
         }
       } catch (error) {
         console.error('Failed to load reports:', error);

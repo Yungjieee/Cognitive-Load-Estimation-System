@@ -17,6 +17,20 @@ export default function AdminQuestionsPage() {
   const [loading, setLoading] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionWithSubtopic | null>(null)
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (selectedQuestion) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [selectedQuestion])
+
   // Filters
   const [subtopicFilter, setSubtopicFilter] = useState<string>('all')
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
@@ -329,11 +343,16 @@ export default function AdminQuestionsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      {/* View button - icon only */}
                       <button
                         onClick={() => setSelectedQuestion(question)}
-                        className="px-4 py-2 text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 font-medium transition-colors"
+                        className="p-2 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+                        title="View question details"
                       >
-                        View Details
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
                       </button>
                     </td>
                   </tr>
@@ -346,163 +365,177 @@ export default function AdminQuestionsPage() {
 
       {/* Question Detail Modal */}
       {selectedQuestion && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-3xl w-full p-6 my-8">
-            <div className="flex items-start justify-between mb-6">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Fixed Header */}
+            <div className="flex items-start justify-between p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   Question #{selectedQuestion.id}
                 </h3>
-                <div className="flex gap-2 mt-2">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
                     {selectedQuestion.subtopics?.name}
                   </span>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      selectedQuestion.difficulty === 'E'
+                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                        : selectedQuestion.difficulty === 'M'
+                        ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                        : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                    }`}
+                  >
                     {getDifficultyLabel(selectedQuestion.difficulty)}
                   </span>
-                  <span className="text-gray-400">•</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
+                  <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                     {getTypeLabel(selectedQuestion.qtype)}
+                  </span>
+                  <span
+                    className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      selectedQuestion.enabled
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}
+                  >
+                    {selectedQuestion.enabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedQuestion(null)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl flex-shrink-0 ml-4"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-6">
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto p-6 space-y-4 flex-1">
               {/* Prompt */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Prompt:
-                </h4>
-                <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
-                  {selectedQuestion.prompt}
-                </p>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Prompt
+                </label>
+                <textarea
+                  readOnly
+                  value={selectedQuestion.prompt}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white resize-none focus:outline-none"
+                />
               </div>
 
               {/* Options (for MCQ) */}
               {selectedQuestion.options && selectedQuestion.options.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Options:
-                  </h4>
-                  <ul className="space-y-2">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Options ({selectedQuestion.options.length})
+                  </label>
+                  <div className="space-y-2">
                     {selectedQuestion.options.map((option: any, idx: number) => (
-                      <li key={idx} className="text-gray-900 dark:text-white">
-                        {idx + 1}. {option}
-                      </li>
+                      <input
+                        key={idx}
+                        readOnly
+                        value={`${idx + 1}. ${option}`}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none"
+                      />
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
               {/* Answer Key */}
               <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Answer Key:
-                </h4>
-                <p className="text-gray-900 dark:text-white">
-                  {JSON.stringify(selectedQuestion.answer_key)}
-                </p>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Answer Key
+                </label>
+                <input
+                  readOnly
+                  value={JSON.stringify(selectedQuestion.answer_key)}
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none"
+                />
               </div>
 
               {/* Hints */}
               {selectedQuestion.hints && selectedQuestion.hints.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Hints ({selectedQuestion.hints.length}):
-                  </h4>
-                  <ul className="space-y-1">
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Hints ({selectedQuestion.hints.length})
+                  </label>
+                  <div className="space-y-2">
                     {selectedQuestion.hints.map((hint: string, idx: number) => (
-                      <li key={idx} className="text-gray-700 dark:text-gray-300">
-                        • {hint}
-                      </li>
+                      <input
+                        key={idx}
+                        readOnly
+                        value={`${idx + 1}. ${hint}`}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none"
+                      />
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
               {/* Explanation */}
               {selectedQuestion.explanation && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Explanation:
-                  </h4>
-                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
-                    {selectedQuestion.explanation}
-                  </p>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Explanation
+                  </label>
+                  <textarea
+                    readOnly
+                    value={selectedQuestion.explanation}
+                    rows={4}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white resize-none focus:outline-none"
+                  />
                 </div>
               )}
 
               {/* Example */}
               {selectedQuestion.example && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Example:
-                  </h4>
-                  <p className="text-gray-900 dark:text-white whitespace-pre-wrap">
-                    {selectedQuestion.example}
-                  </p>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Example
+                  </label>
+                  <textarea
+                    readOnly
+                    value={selectedQuestion.example}
+                    rows={4}
+                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-900 dark:text-white resize-none focus:outline-none"
+                  />
                 </div>
               )}
 
-              {/* Images */}
+              {/* Question Image */}
               {selectedQuestion.image_url && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Question Image:
-                  </h4>
-                  <img
-                    src={selectedQuestion.image_url}
-                    alt="Question"
-                    className="rounded-lg border border-gray-300 dark:border-gray-600 max-w-full"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Question Image
+                  </label>
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-700 p-2">
+                    <img
+                      src={selectedQuestion.image_url}
+                      alt="Question"
+                      className="rounded max-w-full h-auto"
+                    />
+                  </div>
                 </div>
               )}
 
+              {/* Example Image */}
               {selectedQuestion.example_image_url && (
                 <div>
-                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                    Example Image:
-                  </h4>
-                  <img
-                    src={selectedQuestion.example_image_url}
-                    alt="Example"
-                    className="rounded-lg border border-gray-300 dark:border-gray-600 max-w-full"
-                  />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    Example Image
+                  </label>
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-50 dark:bg-gray-700 p-2">
+                    <img
+                      src={selectedQuestion.example_image_url}
+                      alt="Example"
+                      className="rounded max-w-full h-auto"
+                    />
+                  </div>
                 </div>
               )}
-
-              {/* Status */}
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  Status:
-                </h4>
-                <span
-                  className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${
-                    selectedQuestion.enabled
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                  }`}
-                >
-                  {selectedQuestion.enabled ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setSelectedQuestion(null)}
-                className="px-6 py-3 gradient-bg text-white rounded-2xl hover:opacity-90 font-medium"
-              >
-                Close
-              </button>
             </div>
           </div>
         </div>

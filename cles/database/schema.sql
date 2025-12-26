@@ -21,7 +21,10 @@ CREATE TABLE public.users (
   profile_programming_grade VARCHAR(20), -- A, B, C, D, F, or not_taken
 
   -- Settings
-  settings_mode TEXT DEFAULT 'support' CHECK (settings_mode IN ('support', 'no_support'))
+  settings_mode TEXT DEFAULT 'support' CHECK (settings_mode IN ('support', 'no_support')),
+
+  -- Admin role (migration 005)
+  role TEXT DEFAULT 'user' CHECK (role IN ('user', 'admin'))
 );
 
 -- Subtopics table
@@ -204,6 +207,7 @@ CREATE TABLE public.swot_analysis (
 
 -- Indexes for performance
 CREATE INDEX idx_users_email ON public.users(email);
+CREATE INDEX idx_users_role ON public.users(role); -- Migration 005
 CREATE INDEX idx_subtopics_key ON public.subtopics(key);
 CREATE INDEX idx_subtopics_enabled ON public.subtopics(enabled);
 CREATE INDEX idx_questions_subtopic_difficulty ON public.questions(subtopic_id, difficulty);
@@ -354,4 +358,86 @@ CREATE POLICY "Service role can manage all report_insights" ON public.report_ins
 
 CREATE POLICY "Service role can manage all SWOT analysis" ON public.swot_analysis
   FOR ALL USING (auth.role() = 'service_role');
+
+-- Migration 006: Admin RLS Policies
+-- Helper function to check if user is admin
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Admin policies for users table
+CREATE POLICY "Admins can view all users" ON public.users
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "Admins can delete users except themselves" ON public.users
+  FOR DELETE USING (public.is_admin() AND id != auth.uid());
+
+-- Admin policies for subtopics table
+CREATE POLICY "Admins can insert subtopics" ON public.subtopics
+  FOR INSERT WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update subtopics" ON public.subtopics
+  FOR UPDATE USING (public.is_admin());
+
+CREATE POLICY "Admins can delete subtopics" ON public.subtopics
+  FOR DELETE USING (public.is_admin());
+
+-- Admin policies for sessions table
+CREATE POLICY "Admins can view all sessions" ON public.sessions
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for responses table
+CREATE POLICY "Admins can view all responses" ON public.responses
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for SWOT analysis table
+CREATE POLICY "Admins can view all SWOT analyses" ON public.swot_analysis
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for questions table
+CREATE POLICY "Admins can view all questions" ON public.questions
+  FOR SELECT USING (public.is_admin());
+
+CREATE POLICY "Admins can insert questions" ON public.questions
+  FOR INSERT WITH CHECK (public.is_admin());
+
+CREATE POLICY "Admins can update questions" ON public.questions
+  FOR UPDATE USING (public.is_admin());
+
+CREATE POLICY "Admins can delete questions" ON public.questions
+  FOR DELETE USING (public.is_admin());
+
+-- Admin policies for NASA-TLX system table
+CREATE POLICY "Admins can view all NASA-TLX system data" ON public.nasa_tlx_system
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for NASA-TLX user table
+CREATE POLICY "Admins can view all NASA-TLX user data" ON public.nasa_tlx_user
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for cognitive load summary table
+CREATE POLICY "Admins can view all cognitive load summaries" ON public.cognitive_load_summary
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for report insights table
+CREATE POLICY "Admins can view all report insights" ON public.report_insights
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for events table
+CREATE POLICY "Admins can view all events" ON public.events
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for HR beats table
+CREATE POLICY "Admins can view all HR beats" ON public.hr_beats
+  FOR SELECT USING (public.is_admin());
+
+-- Admin policies for attention events table
+CREATE POLICY "Admins can view all attention events" ON public.attention_events
+  FOR SELECT USING (public.is_admin());
 

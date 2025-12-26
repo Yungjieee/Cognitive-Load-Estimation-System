@@ -518,11 +518,34 @@ export default function CalibrationPage() {
               
               <div className="text-center">
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {calibrationState.isActive ? 'Collecting baseline data...' : 
-                   calibrationState.isComplete ? 'Baseline established' : 
+                  {calibrationState.isActive ? 'Collecting baseline data...' :
+                   calibrationState.isComplete ? 'Baseline established' :
                    calibrating ? 'Calibrating...' :
                    'Ready for calibration'}
                 </div>
+
+                {/* LED sync instruction - shown only when ready (before calibration) */}
+                {!calibrating && !calibrationState.isActive && !calibrationState.isComplete && (
+                  <div className="mt-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                    <div className="text-left">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-purple-600 dark:text-purple-400 text-lg">💡</span>
+                        <span className="text-xs font-bold text-purple-700 dark:text-purple-300">Instruction</span>
+                      </div>
+                      <div className="text-xs text-purple-700 dark:text-purple-300 space-y-1 ml-2">
+                        <div className="flex gap-4">
+                          <span className="font-semibold flex-shrink-0">1.</span>
+                          <span>Wait for the blue LED to sync with your heartbeat</span>
+                        </div>
+                        <div className="flex gap-3">
+                          <span className="font-semibold flex-shrink-0">2.</span>
+                          <span>Then click Start Calibration button</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {calibrationState.isActive && (
                   <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">
                     Progress: {calibrationState.progress}/10 seconds
@@ -683,11 +706,11 @@ export default function CalibrationPage() {
                   </div>
                   <h3 className="text-xl font-bold text-green-800 dark:text-green-200 mb-2">Calibration Complete!</h3>
                   <p className="text-green-700 dark:text-green-300 text-sm mb-2">Your devices are ready for monitoring</p>
-                  {rmssdBaseline && (
+                  {/* {rmssdBaseline && (
                     <p className="text-green-600 dark:text-green-400 text-xs">
                       RMSSD Baseline: {rmssdBaseline.toFixed(1)}ms
                     </p>
-                  )}
+                  )} */}
                 </div>
                 <button
                   onClick={startTask}
