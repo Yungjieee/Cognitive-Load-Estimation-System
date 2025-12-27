@@ -10,6 +10,7 @@ interface RevealCardProps {
   pointsAwarded: number;
   onNext: () => void;
   isLastQuestion?: boolean;
+  isFinishing?: boolean;
 }
 
 export default function RevealCard({
@@ -17,7 +18,8 @@ export default function RevealCard({
   isCorrect,
   pointsAwarded,
   onNext,
-  isLastQuestion = false
+  isLastQuestion = false,
+  isFinishing = false
 }: RevealCardProps) {
   // Get deterministic encouragement message based on question ID and correctness
   const encouragementMessage = useMemo(() => {
@@ -139,9 +141,16 @@ export default function RevealCard({
       {/* Next Button */}
       <button
         onClick={onNext}
-        className="w-full rounded-xl px-6 py-3 btn-primary text-white font-semibold transition-all duration-300 hover:shadow-lg"
+        disabled={isFinishing}
+        className="w-full rounded-xl px-6 py-3 btn-primary text-white font-semibold transition-all duration-300 hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {isLastQuestion ? 'Finish Session' : 'Next Question'}
+        {isFinishing && (
+          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        )}
+        {isFinishing ? 'Finishing Session...' : (isLastQuestion ? 'Finish Session' : 'Next Question')}
       </button>
     </div>
   );

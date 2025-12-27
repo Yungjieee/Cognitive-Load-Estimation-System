@@ -42,7 +42,9 @@ export default function AdminReportDetailPage() {
   const [userEmail, setUserEmail] = useState<string>('Unknown User');
   const [loading, setLoading] = useState(true);
   const [expandedCards, setExpandedCards] = useState<number[]>([]);
-  const [dimensionsExpanded, setDimensionsExpanded] = useState(false);
+  const [cogLoadInfoExpanded, setCogLoadInfoExpanded] = useState(false);
+  const [dimensionsInfoExpanded, setDimensionsInfoExpanded] = useState(false);
+  const [hrvInfoExpanded, setHrvInfoExpanded] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
   const [insightsError, setInsightsError] = useState(false);
@@ -201,7 +203,7 @@ export default function AdminReportDetailPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-4 mb-6 no-print">
             <a href="/admin/reports" className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 font-medium">
@@ -229,7 +231,7 @@ export default function AdminReportDetailPage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Overview</h2>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
             <div className="text-center p-4 rounded-xl bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20">
               <div className="text-3xl font-bold gradient-text">{report.score}/10</div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Score</div>
@@ -247,6 +249,18 @@ export default function AdminReportDetailPage() {
                 {report.attentionRate !== null && report.attentionRate !== undefined ? `${Math.round(report.attentionRate)}%` : 'N/A'}
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Attention Rate</div>
+            </div>
+            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20">
+              <div className="text-3xl font-bold gradient-text">
+                {(() => {
+                  const peakCogLoad = report.nasaTlxSystem && report.nasaTlxSystem.length > 0
+                    ? Math.max(...report.nasaTlxSystem.map((n: any) => n.cognitive_load))
+                    : 0;
+                  const peakPercentage = Math.round((peakCogLoad / 20) * 100);
+                  return `${peakPercentage}%`;
+                })()}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300 font-medium">Highest Cognitive Load</div>
             </div>
           </div>
         </div>
@@ -362,13 +376,48 @@ export default function AdminReportDetailPage() {
 
           <div className="grid grid-cols-1 gap-8">
             {/* Chart A: Overall Cognitive Load - Horizontal Bars */}
-            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl">
-              <h3 className="text-center font-semibold text-lg mb-8 text-gray-900 dark:text-white">Overall Cognitive Load</h3>
+            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl relative">
+              <div className="flex items-center justify-center mb-8">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Overall Cognitive Load</h3>
+                <button
+                  onClick={() => setCogLoadInfoExpanded(!cogLoadInfoExpanded)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center text-sm font-bold"
+                  title="Information"
+                >
+                  ℹ️
+                </button>
+              </div>
+
+              {cogLoadInfoExpanded && (
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Understanding the Comparison</h4>
+                  <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                    <div className="flex gap-2">
+                      <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                      <div>
+                        <span className="font-semibold">System Average:</span> The average cognitive load calculated by the system across all questions based on performance metrics
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                      <div>
+                        <span className="font-semibold">System Highest:</span> The peak cognitive load experienced during any single question in this session
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                      <div>
+                        <span className="font-semibold">User Reported:</span> Your subjective assessment of cognitive load from the post-session survey
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-6 max-w-4xl mx-auto">
-                {/* System Row */}
+                {/* System Average Row */}
                 <div className="flex items-center gap-4">
-                  <div className="w-20 text-sm font-semibold text-gray-700 dark:text-gray-300">System</div>
+                  <div className="w-32 text-sm font-semibold text-gray-700 dark:text-gray-300">System Average</div>
                   <div className="flex-1 relative group cursor-pointer">
                     {/* Tooltip */}
                     <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-700/90 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
@@ -404,9 +453,57 @@ export default function AdminReportDetailPage() {
                   </div>
                 </div>
 
-                {/* User Row */}
+                {/* System Highest Row */}
+                {(() => {
+                  const peakCogLoad = report.nasaTlxSystem && report.nasaTlxSystem.length > 0
+                    ? Math.max(...report.nasaTlxSystem.map((n: any) => n.cognitive_load))
+                    : 0;
+                  const peakPercentage = Math.round((peakCogLoad / 20) * 100);
+                  const peakLoadLevel = peakCogLoad <= 7 ? 'Low' : peakCogLoad <= 14 ? 'Medium' : 'High';
+
+                  return (
+                    <div className="flex items-center gap-4">
+                      <div className="w-32 text-sm font-semibold text-gray-700 dark:text-gray-300">System Highest</div>
+                      <div className="flex-1 relative group cursor-pointer">
+                        {/* Tooltip */}
+                        <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 bg-gray-900/90 dark:bg-gray-700/90 text-white text-xs rounded-lg px-3 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10 shadow-lg">
+                          <div className="font-semibold mb-1">System Highest Cognitive Load</div>
+                          <div>Value: {peakCogLoad.toFixed(1)}/20</div>
+                          <div>Percentage: {peakPercentage}%</div>
+                          <div>Load Level: {peakLoadLevel}</div>
+                        </div>
+                        {/* Horizontal bar */}
+                        <div className="h-12 bg-gray-200 dark:bg-gray-600 rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all duration-300"
+                            style={{ width: `${peakPercentage}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <span className="text-lg font-bold text-gray-700 dark:text-gray-300">
+                          {peakPercentage}%
+                        </span>
+                        <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                          peakCogLoad <= 7
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : peakCogLoad <= 14
+                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                          {peakLoadLevel}
+                        </span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {peakCogLoad.toFixed(1)}/20
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* User Reported Row */}
                 <div className="flex items-center gap-4">
-                  <div className="w-20 text-sm font-semibold text-gray-700 dark:text-gray-300">User</div>
+                  <div className="w-32 text-sm font-semibold text-gray-700 dark:text-gray-300">User Reported</div>
                   <div className="flex-1 relative group cursor-pointer">
                     {/* Tooltip */}
                     {report.nasaTlxUser?.cognitive_load && (
@@ -459,8 +556,51 @@ export default function AdminReportDetailPage() {
             </div>
 
             {/* Chart B: 6 Dimensions Grouped Bar Chart */}
-            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl">
-              <h3 className="text-center font-semibold text-lg mb-6 text-gray-900 dark:text-white">By Cognitive Load Dimensions</h3>
+            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl relative">
+              <div className="flex items-center justify-center mb-6">
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">By Cognitive Load Dimensions</h3>
+                <button
+                  onClick={() => setDimensionsInfoExpanded(!dimensionsInfoExpanded)}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center text-sm font-bold"
+                  title="Information"
+                >
+                  ℹ️
+                </button>
+              </div>
+
+              {dimensionsInfoExpanded && (
+                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                    Your cognitive load is measured across six key dimensions (scale: 0-20, where higher values indicate greater load):
+                  </p>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Mental Demand</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How much mental effort was required for thinking, deciding, and problem-solving.</p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Physical Demand</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How distracting was your environment? Was it noisy, uncomfortable, or did people interrupt you?</p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Time Pressure</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How much time pressure you felt while completing the tasks.</p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Task Success</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-blue-700 dark:text-blue-300">(Higher scores = better performance)</span></p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Effort</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How hard you had to work (mentally and physically) to achieve your level of performance.</p>
+                    </div>
+                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Frustration</h5>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">How discouraged, stressed, or annoyed you felt during the tasks.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Legend */}
               <div className="flex items-center justify-center gap-8 mb-8">
@@ -548,19 +688,19 @@ export default function AdminReportDetailPage() {
         </div>
 
         {/* Dimension Explanations */}
-        <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
+        {/* <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
           <button
-            onClick={() => setDimensionsExpanded(!dimensionsExpanded)}
+            onClick={() => setDimensionsInfoExpanded(!dimensionsInfoExpanded)}
             className="w-full flex items-center gap-3 mb-4 hover:opacity-80 transition-opacity"
           >
             <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
               <span className="text-white font-bold text-sm">📊</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white flex-1 text-left">Understanding Cognitive Load Dimensions</h2>
-            <span className="text-gray-500 dark:text-gray-400 text-xl">{dimensionsExpanded ? '▼' : '▶'}</span>
+            <span className="text-gray-500 dark:text-gray-400 text-xl">{dimensionsInfoExpanded ? '▼' : '▶'}</span>
           </button>
 
-          {dimensionsExpanded && (
+          {dimensionsInfoExpanded && (
             <div className="mt-4 space-y-4">
               <p className="text-gray-600 dark:text-gray-300">
                 Your cognitive load is measured across six key dimensions (scale: 0-20, where higher values indicate greater load):
@@ -570,30 +710,30 @@ export default function AdminReportDetailPage() {
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Mental Demand</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">How much mental effort was required for thinking, deciding, and problem-solving.</p>
                 </div>
-                <div className="border-l-4 border-green-500 pl-4 bg-green-50/50 dark:bg-green-900/10 py-3 rounded-r">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Physical Demand</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">How distracting was your environment? Was it noisy, uncomfortable, or did people interrupt you?</p>
                 </div>
-                <div className="border-l-4 border-yellow-500 pl-4 bg-yellow-50/50 dark:bg-yellow-900/10 py-3 rounded-r">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Time Pressure</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">How much time pressure you felt while completing the tasks.</p>
                 </div>
-                <div className="border-l-4 border-purple-500 pl-4 bg-purple-50/50 dark:bg-purple-900/10 py-3 rounded-r">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Task Success</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-purple-700 dark:text-purple-300">(Higher scores = better performance)</span></p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-blue-700 dark:text-blue-300">(Higher scores = better performance)</span></p>
                 </div>
-                <div className="border-l-4 border-orange-500 pl-4 bg-orange-50/50 dark:bg-orange-900/10 py-3 rounded-r">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Effort</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">How hard you had to work (mentally and physically) to achieve your level of performance.</p>
                 </div>
-                <div className="border-l-4 border-red-500 pl-4 bg-red-50/50 dark:bg-red-900/10 py-3 rounded-r">
+                <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
                   <h3 className="font-semibold text-gray-800 dark:text-gray-200">Frustration</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">How discouraged, stressed, or annoyed you felt during the tasks.</p>
                 </div>
               </div>
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Section 4: Per-Question Detail Cards */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
@@ -877,13 +1017,47 @@ export default function AdminReportDetailPage() {
 
         {/* HRV Summary */}
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-6 border border-purple-200/30 dark:border-purple-800/30 shadow-lg mb-8">
-          <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-3 mb-6 relative">
             <div className="w-10 h-10 rounded-xl gradient-bg flex items-center justify-center">
               <span className="text-white font-bold text-sm">❤️</span>
             </div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Heart Rate Variability Analysis</h2>
+            <button
+              onClick={() => setHrvInfoExpanded(!hrvInfoExpanded)}
+              className="absolute right-0 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center text-sm font-bold"
+              title="Information"
+            >
+              ℹ️
+            </button>
           </div>
-          
+
+          {/* Info Explanation */}
+          {hrvInfoExpanded && (
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">HRV Interpretation</h4>
+              <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                <div className="flex gap-2">
+                  <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                  <div>
+                    <span className="font-semibold">High HRV:</span> Indicates good autonomic nervous system balance and lower stress
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                  <div>
+                    <span className="font-semibold">Low HRV:</span> May indicate higher stress or cognitive load
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <span className="font-medium text-blue-600 dark:text-blue-400">•</span>
+                  <div>
+                    <span className="font-semibold">RMSSD:</span> Root Mean Square of Successive Differences - higher values indicate better recovery
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4">
             {Array.from({ length: 5 }, (_, index) => {
               const response = report.responses.find((r: any) => r.q_index === index + 1);
@@ -903,9 +1077,11 @@ export default function AdminReportDetailPage() {
                   <div className="w-12 text-sm font-semibold text-gray-900 dark:text-white">Q{index + 1}</div>
                   <div className="flex-1 flex items-center gap-4">
                     <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      hrvData.hrv === 'high' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' 
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                      hrvData.hrv === 'high'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : hrvData.hrv === 'low'
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
                     }`}>
                       HRV: {hrvData.hrv.toUpperCase()}
                     </div>
@@ -933,29 +1109,19 @@ export default function AdminReportDetailPage() {
               );
             })}
           </div>
-          
-          <div className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20">
-            <div className="text-sm text-blue-800 dark:text-blue-200">
-              <div className="font-semibold mb-2">HRV Interpretation:</div>
-              <ul className="space-y-1 text-xs">
-                <li>• <strong>High HRV:</strong> Indicates good autonomic nervous system balance and lower stress</li>
-                <li>• <strong>Low HRV:</strong> May indicate higher stress or cognitive load</li>
-                <li>• <strong>RMSSD:</strong> Root Mean Square of Successive Differences - higher values indicate better recovery</li>
-              </ul>
-            </div>
-          </div>
 
           {/* Aggregate HRV Statistics */}
           {(() => {
             const questionsWithHRV = report.responses.filter((r: any) => r.metrics?.hrv);
-            const highStressCount = questionsWithHRV.filter((r: any) => r.metrics.hrv === 'low').length;
-            const lowStressCount = questionsWithHRV.filter((r: any) => r.metrics.hrv === 'high').length;
-            const avgRMSSD = questionsWithHRV.length > 0
-              ? questionsWithHRV.reduce((sum: number, r: any) => sum + (r.metrics.rmssd_q || 0), 0) / questionsWithHRV.length
+            const validHRVQuestions = questionsWithHRV.filter((r: any) => r.metrics.hrv !== 'insufficient');
+            const highStressCount = validHRVQuestions.filter((r: any) => r.metrics.hrv === 'low').length;
+            const lowStressCount = validHRVQuestions.filter((r: any) => r.metrics.hrv === 'high').length;
+            const avgRMSSD = validHRVQuestions.length > 0
+              ? validHRVQuestions.reduce((sum: number, r: any) => sum + (r.metrics.rmssd_q || 0), 0) / validHRVQuestions.length
               : 0;
             const baseline = report.rmssdBaseline || report.responses[0]?.metrics?.rmssd_base || 0;
 
-            if (questionsWithHRV.length > 0) {
+            if (validHRVQuestions.length > 0) {
               return (
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-center">

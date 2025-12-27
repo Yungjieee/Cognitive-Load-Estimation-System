@@ -83,7 +83,7 @@ export function calculateMentalDemand(
   const preparedness = 0.6 * priorKnowledge + 0.4 * experienceLevel
 
   // Step 4: Task Difficulty
-  const difficultyMap: Record<string, number> = { E: 0.2, M: 0.5, H: 1.0 }
+  const difficultyMap: Record<string, number> = { E: 0.33, M: 0.67, H: 1.0 }
   const difficultyValue = difficultyMap[difficulty] || 0.5
 
   // Step 5: Mental Demand
@@ -207,9 +207,9 @@ export function calculateEffort(
 
   // 4. Combine with equal weights (33.33% each)
   const effort = (
-    0.33 * timeRatio +      // 33% - time invested
-    0.33 * helpRatio +      // 33% - help needed
-    0.33 * attentionRatio   // 33% - attention invested
+    0.40 * timeRatio +      // 33% - time invested
+    0.20 * helpRatio +      // 33% - help needed
+    0.40 * attentionRatio   // 33% - attention invested
   ) * 20
 
   return Math.max(0, Math.min(20, effort))

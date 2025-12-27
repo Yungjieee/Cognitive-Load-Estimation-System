@@ -32,6 +32,7 @@ export default function SessionPage() {
   const [hintPanelShouldGlow, setHintPanelShouldGlow] = useState(false);
   const [lastHintInteractionTime, setLastHintInteractionTime] = useState<number>(0);
   const [isSkipping, setIsSkipping] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // ESP32 device commands
   const { sendCommand, stopSession } = useDeviceCommands();
@@ -421,6 +422,10 @@ export default function SessionPage() {
   }
 
   function handleNextQuestion() {
+    // Check if this is the last question
+    if (sessionState && sessionState.currentQuestionIndex === sessionState.questions.length - 1) {
+      setIsFinishing(true);
+    }
     sessionEngine.nextQuestion();
     setCurrentAnswer(null);
   }
@@ -599,6 +604,7 @@ export default function SessionPage() {
                   pointsAwarded={sessionState.scores[sessionState.currentQuestionIndex]}
                   onNext={handleNextQuestion}
                   isLastQuestion={isLastQuestion}
+                  isFinishing={isFinishing}
                 />
               ) : (
                 <div className="space-y-6">

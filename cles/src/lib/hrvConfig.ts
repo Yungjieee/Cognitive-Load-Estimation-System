@@ -6,7 +6,7 @@ export const HRV_CONFIG = {
   HRV_BASELINE_SECONDS: 15,
   
   // HRV labeling threshold
-  HRV_HIGH_FACTOR: 1.15, // RMSSD_q >= 1.15 * RMSSD_base → 'high'
+  HRV_STRESS_THRESHOLD: 0.90, // RMSSD_q <= 0.90 * RMSSD_base → 'low' (stressed)
   
   // IBI filtering thresholds (in milliseconds)
   IBI_VALID_MIN: 300,     // Minimum valid IBI (300ms = 200 BPM max)
@@ -20,7 +20,7 @@ export const HRV_CONFIG = {
   CALIBRATION_DURATION_MS: 15000, // 15 seconds for baseline (longer calibration)
 } as const;
 
-export type HRVLabel = 'high' | 'low';
+export type HRVLabel = 'high' | 'low' | 'insufficient';
 export type HRVConfidence = 'ok' | 'low';
 
 export interface HRVMetrics {

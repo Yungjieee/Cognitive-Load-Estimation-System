@@ -108,7 +108,7 @@ export function computeQuestionHRV(
   
   if (filteredIBIs.length < HRV_CONFIG.MIN_BEATS_PER_QUESTION) {
     return {
-      hrv: 'low',
+      hrv: 'insufficient',
       rmssd_q: 0,
       rmssd_base: baselineRMSSD,
       hrv_confidence: 'low'
@@ -116,8 +116,8 @@ export function computeQuestionHRV(
   }
   
   const rmssd_q = computeRMSSD(filteredIBIs);
-  const threshold = baselineRMSSD * HRV_CONFIG.HRV_HIGH_FACTOR;
-  const hrv: HRVLabel = rmssd_q >= threshold ? 'high' : 'low';
+  const threshold = baselineRMSSD * HRV_CONFIG.HRV_STRESS_THRESHOLD;
+  const hrv: HRVLabel = rmssd_q <= threshold ? 'low' : 'high';
   
   return {
     hrv,
