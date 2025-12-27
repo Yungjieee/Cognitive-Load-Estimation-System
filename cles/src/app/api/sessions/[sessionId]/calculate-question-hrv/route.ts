@@ -78,7 +78,7 @@ export async function POST(
       console.warn(`⚠️ Not enough valid beats after filtering for Q${qIndex}: ${filteredBeats.length} (need at least 2)`);
 
       await DatabaseClient.updateResponseHRVMetrics(sessionId, qIndex, {
-        hrv: 'low',
+        hrv: 'insufficient',
         rmssd_q: 0,
         rmssd_base: baselineRMSSD,
         hrv_confidence: 'low'
@@ -87,7 +87,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         hrvMetrics: {
-          hrv: 'low',
+          hrv: 'insufficient',
           rmssd_q: 0,
           rmssd_base: baselineRMSSD,
           hrv_confidence: 'low'
@@ -103,8 +103,8 @@ export async function POST(
     console.log(`📈 Question ${qIndex} RMSSD: ${rmssd_q.toFixed(2)}ms (from ${filteredBeats.length} beats)`);
 
     // Step 5: Compare to baseline and label HRV
-    const threshold = baselineRMSSD * HRV_CONFIG.HRV_HIGH_FACTOR;
-    const hrvLabel = rmssd_q >= threshold ? 'high' : 'low';
+    const threshold = baselineRMSSD * HRV_CONFIG.HRV_STRESS_THRESHOLD;
+    const hrvLabel = rmssd_q <= threshold ? 'low' : 'high';
 
     // Step 6: Determine confidence based on beat count
     // For QUESTIONS: Allow <10 beats but mark as 'low' confidence

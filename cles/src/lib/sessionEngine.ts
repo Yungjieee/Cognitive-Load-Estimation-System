@@ -36,6 +36,8 @@ export interface SessionState {
   hintsUsed: number[];
   exampleUsed: boolean[];
   extraTimeUsed: boolean[];
+  showSupportPopup: boolean;
+  supportPopupShown: boolean[];
   scores: number[];
   totalScore: number;
   totalPenalties: number;
@@ -97,6 +99,8 @@ class SessionEngine {
       hintsUsed: new Array(5).fill(0),
       exampleUsed: new Array(5).fill(false),
       extraTimeUsed: new Array(5).fill(false),
+      showSupportPopup: false,
+      supportPopupShown: new Array(5).fill(false),
       scores: new Array(5).fill(0),
       totalScore: 0,
       totalPenalties: 0,
@@ -629,6 +633,9 @@ class SessionEngine {
     this.state.timeRemaining = timerState.timeRemaining;
     this.state.isPaused = timerState.isPaused;
 
+    // Check for support popup trigger at 20 seconds
+    this.checkSupportPopupTrigger();
+
     this.updateState();
   }
 
@@ -637,6 +644,66 @@ class SessionEngine {
     if (!this.state) return;
 
     this.updateState();
+  }
+
+  // Check if we should show support popup at 20 seconds
+  private checkSupportPopupTrigger(): void {
+    if (!this.state) return;
+
+    const {
+      mode,
+      timeRemaining,
+      currentQuestionIndex,
+      hintsUsed,
+      exampleUsed,
+      supportPopupShown,
+      showSupportPopup,
+      showReveal
+    } = this.state;
+
+    // Only for support mode
+    if (mode !== 'support') return;
+
+    // Only for Q4 and Q5 (indices 3 and 4)
+    if (currentQuestionIndex !== 3 && currentQuestionIndex !== 4) return;
+
+    // Only at exactly 20 seconds remaining
+    if (timeRemaining !== 20) return;
+
+    // Don't show if already shown for this question
+    if (supportPopupShown[currentQuestionIndex]) return;
+
+    // Don't show if popup is already visible
+    if (showSupportPopup) return;
+
+    // Don't show if answer is revealed
+    if (showReveal) return;
+
+    // Check conditions: example NOT used AND hints < 2
+    const exampleNotUsed = !exampleUsed[currentQuestionIndex];
+    const hintsLessThan2 = hintsUsed[currentQuestionIndex] < 2;
+
+    // If all conditions met, show popup
+    if (exampleNotUsed && hintsLessThan2) {
+      this.state.showSupportPopup = true;
+      this.state.supportPopupShown[currentQuestionIndex] = true;
+      // Note: updateState() will be called in handleTimerEvent
+    }
+  }
+
+  // Dismiss support popup (user clicked "No")
+  public dismissSupportPopup(): void {
+    if (!this.state) return;
+    this.state.showSupportPopup = false;
+    this.updateState();
+  }
+
+  // Accept support offer (user clicked "Yes")
+  public acceptSupportOffer(): void {
+    if (!this.state) return;
+    this.state.showSupportPopup = false;
+    this.updateState();
+    // The actual example expansion will be triggered in page.tsx
   }
 
   // Handle timeout

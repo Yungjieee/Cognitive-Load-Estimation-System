@@ -15,6 +15,7 @@ import TimeUpModal from "@/components/TimeUpModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import RevealCard from "@/components/RevealCard";
 import StressorBanner from "@/components/StressorBanner";
+import SupportPopupModal from "@/components/SupportPopupModal";
 import { useDeviceCommands } from "@/lib/hooks/useDeviceCommands";
 
 export default function SessionPage() {
@@ -33,6 +34,7 @@ export default function SessionPage() {
   const [lastHintInteractionTime, setLastHintInteractionTime] = useState<number>(0);
   const [isSkipping, setIsSkipping] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [forceExpandExample, setForceExpandExample] = useState(false);
 
   // ESP32 device commands
   const { sendCommand, stopSession } = useDeviceCommands();
@@ -421,6 +423,21 @@ export default function SessionPage() {
     sessionEngine.useHint(type);
   }
 
+  function handleAcceptSupport() {
+    // Close the popup via engine
+    sessionEngine.acceptSupportOffer();
+
+    // Force-expand the example in HintPanel
+    setForceExpandExample(true);
+
+    // Reset the force flag after a brief delay to allow re-triggering if needed
+    setTimeout(() => setForceExpandExample(false), 500);
+  }
+
+  function handleDismissSupport() {
+    sessionEngine.dismissSupportPopup();
+  }
+
   function handleNextQuestion() {
     // Check if this is the last question
     if (sessionState && sessionState.currentQuestionIndex === sessionState.questions.length - 1) {
@@ -645,6 +662,7 @@ export default function SessionPage() {
                 onUseHint={handleUseHint}
                 disabled={sessionState.isPaused}
                 shouldGlow={hintPanelShouldGlow}
+                forceExpandExample={forceExpandExample}
               />
             ) : (
               <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl p-4 border border-purple-200/30 dark:border-purple-800/30 shadow-lg">
@@ -699,6 +717,15 @@ export default function SessionPage() {
           onCancel={handleCancelSkip}
           variant="warning"
           isLoading={isSkipping}
+        />
+      )}
+
+      {/* Support Popup Modal */}
+      {sessionState.showSupportPopup && (
+        <SupportPopupModal
+          isOpen={sessionState.showSupportPopup}
+          onYes={handleAcceptSupport}
+          onNo={handleDismissSupport}
         />
       )}
     </div>

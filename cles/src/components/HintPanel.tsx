@@ -11,6 +11,7 @@ interface HintPanelProps {
   onUseHint: (type: 'hint' | 'example') => void;
   disabled?: boolean;
   shouldGlow?: boolean;
+  forceExpandExample?: boolean;
 }
 
 export default function HintPanel({
@@ -18,7 +19,8 @@ export default function HintPanel({
   hintsUsed,
   onUseHint,
   disabled = false,
-  shouldGlow = false
+  shouldGlow = false,
+  forceExpandExample = false
 }: HintPanelProps) {
   const [showHint1, setShowHint1] = useState(false);
   const [showHint2, setShowHint2] = useState(false);
@@ -33,6 +35,15 @@ export default function HintPanel({
     setShowHint3(false);
     setShowExample(false);
   }, [question.id]);
+
+  // Auto-expand example when support popup accepted
+  useEffect(() => {
+    if (forceExpandExample && !showExample) {
+      // Trigger the example expansion
+      onUseHint('example');
+      setShowExample(true);
+    }
+  }, [forceExpandExample, showExample, onUseHint]);
 
   const maxHints = 3;
   const canUseHint1 = hintsUsed < 1;
