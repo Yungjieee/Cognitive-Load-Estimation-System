@@ -42,6 +42,7 @@ export default function ReportPage() {
   const [expandedCards, setExpandedCards] = useState<number[]>([]);
   const [cogLoadInfoExpanded, setCogLoadInfoExpanded] = useState(false);
   const [dimensionsInfoExpanded, setDimensionsInfoExpanded] = useState(false);
+  const [physicalDemandInfoExpanded, setPhysicalDemandInfoExpanded] = useState(false);
   const [hrvInfoExpanded, setHrvInfoExpanded] = useState(false);
   const [insights, setInsights] = useState<string | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -190,7 +191,7 @@ export default function ReportPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="mx-auto max-w-6xl px-4 py-10">
+      <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-4 mb-6 no-print">
             <a href="/home" className="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-300 font-medium">
@@ -546,135 +547,244 @@ export default function ReportPage() {
               </div>
             </div>
 
-            {/* Chart B: 6 Dimensions Grouped Bar Chart */}
-            <div className="p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl relative">
-              <div className="flex items-center justify-center mb-6">
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">By Cognitive Load Dimensions</h3>
-                <button
-                  onClick={() => setDimensionsInfoExpanded(!dimensionsInfoExpanded)}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center text-sm font-bold"
-                  title="Information"
-                >
-                  ℹ️
-                </button>
-              </div>
+            {/* Chart B: Side-by-Side Cognitive Load Charts */}
+            <div className="grid grid-cols-3 gap-6">
+              {/* Left Card: 5 Dimensions (System vs User) */}
+              <div className="col-span-2 p-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl relative">
+                <div className="flex items-center justify-center mb-6">
+                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">By Cognitive Load Dimensions</h3>
+                  <button
+                    onClick={() => setDimensionsInfoExpanded(!dimensionsInfoExpanded)}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-center text-sm font-bold"
+                    title="Information"
+                  >
+                    ℹ️
+                  </button>
+                </div>
 
-              {/* Info Explanation */}
-              {dimensionsInfoExpanded && (
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Understanding Cognitive Load Dimensions</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
-                    Your cognitive load is measured across six key dimensions (scale: 0-20, where higher values indicate greater load):
-                  </p>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Mental Demand</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How much mental effort was required for thinking, deciding, and problem-solving.</p>
-                    </div>
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Physical Demand</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How distracting was your environment? Was it noisy, uncomfortable, or did people interrupt you?</p>
-                    </div>
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Time Pressure</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How much time pressure you felt while completing the tasks.</p>
-                    </div>
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Task Success</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-blue-700 dark:text-blue-300">(Higher scores = better performance)</span></p>
-                    </div>
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Effort</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How hard you had to work (mentally and physically) to achieve your level of performance.</p>
-                    </div>
-                    <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
-                      <h5 className="font-semibold text-gray-800 dark:text-gray-200">Frustration</h5>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">How discouraged, stressed, or annoyed you felt during the tasks.</p>
+                {/* Info Explanation */}
+                {dimensionsInfoExpanded && (
+                  <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Understanding Cognitive Load Dimensions</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
+                      Your cognitive load is measured across six key dimensions (scale: 0-20, where higher values indicate greater load):
+                    </p>
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Mental Demand</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How much mental effort was required for thinking, deciding, and problem-solving.</p>
+                      </div>
+                      <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Time Pressure</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How much time pressure you felt while completing the tasks.</p>
+                      </div>
+                      <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Task Success</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How successful you felt in accomplishing the task goals. <span className="font-medium text-blue-700 dark:text-blue-300">(Higher scores = better performance)</span></p>
+                      </div>
+                      <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Effort</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How hard you had to work (mentally and physically) to achieve your level of performance.</p>
+                      </div>
+                      <div className="border-l-4 border-blue-500 pl-4 bg-blue-50/50 dark:bg-blue-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Frustration</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How discouraged, stressed, or annoyed you felt during the tasks.</p>
+                      </div>
+                      <div className="border-l-4 border-purple-500 pl-4 bg-purple-50/50 dark:bg-purple-900/10 py-3 rounded-r">
+                        <h5 className="font-semibold text-gray-800 dark:text-gray-200">Physical Demand</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">How much physical activity or environmental distraction affected your task performance.</p>
+                      </div>
                     </div>
                   </div>
+                )}
+
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-8 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-blue-500 rounded"></div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 bg-orange-500 rounded"></div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">User</span>
+                  </div>
                 </div>
-              )}
 
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-8 mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-blue-500 rounded"></div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">System</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 bg-orange-500 rounded"></div>
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">User</span>
-                </div>
-              </div>
+                {/* Chart - 5 Dimensions */}
+                <div className="flex items-end justify-center gap-6 p-6 bg-white dark:bg-gray-800 rounded-xl" style={{ height: '350px' }}>
+                  {[
+                    { name: 'Mental', abbr: 'MD', sys: 'sys_mental_demand', user: 'mental_demand' },
+                    { name: 'Time Pressure', abbr: 'TD', sys: 'sys_temporal_demand', user: 'temporal_demand' },
+                    { name: 'Task Success', abbr: 'Perf', sys: 'sys_performance', user: 'performance' },
+                    { name: 'Effort', abbr: 'Eff', sys: 'sys_effort', user: 'effort' },
+                    { name: 'Frustration', abbr: 'Frust', sys: 'sys_frustration', user: 'frustration' }
+                  ].map((dim, index) => {
+                    const systemValue = getDisplayValue(dim.sys, report.cognitiveLoadSummary?.[dim.sys] || 0);
+                    const userValue = getDisplayValue(dim.user, report.nasaTlxUser?.[dim.user] || 0);
 
-              {/* Chart */}
-              <div className="flex items-end justify-center gap-8 p-6 bg-white dark:bg-gray-800 rounded-xl" style={{ height: '350px' }}>
-                {[
-                  { name: 'Mental', abbr: 'MD', sys: 'sys_mental_demand', user: 'mental_demand' },
-                  { name: 'Physical', abbr: 'PD', sys: 'sys_physical_demand', user: 'physical_demand' },
-                  { name: 'Time Pressure', abbr: 'TD', sys: 'sys_temporal_demand', user: 'temporal_demand' },
-                  { name: 'Task Success', abbr: 'Perf', sys: 'sys_performance', user: 'performance' },
-                  { name: 'Effort', abbr: 'Eff', sys: 'sys_effort', user: 'effort' },
-                  { name: 'Frustration', abbr: 'Frust', sys: 'sys_frustration', user: 'frustration' }
-                ].map((dim, index) => {
-                  const systemValue = getDisplayValue(dim.sys, report.cognitiveLoadSummary?.[dim.sys] || 0);
-                  const userValue = getDisplayValue(dim.user, report.nasaTlxUser?.[dim.user] || 0);
-
-                  return (
-                    <div key={index} className="flex flex-col items-center">
-                      {/* Bar group */}
-                      <div className="flex gap-2 items-end" style={{ height: '240px' }}>
-                        {/* System bar */}
-                        <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
-                          {systemValue > 0 && (
-                            <div
-                              className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap cursor-help"
-                              title={`Raw score: ${systemValue.toFixed(1)}/20`}
-                            >
-                              {Math.round((systemValue / 20) * 100)}%
-                            </div>
-                          )}
-                          <div
-                            className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-300"
-                            style={{ height: `${Math.max((systemValue / 20) * 240, systemValue > 0 ? 10 : 0)}px` }}
-                            title={`System ${dim.name}: ${systemValue.toFixed(1)}`}
-                          />
-                        </div>
-
-                        {/* User bar */}
-                        <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
-                          {userValue > 0 ? (
-                            <>
+                    return (
+                      <div key={index} className="flex flex-col items-center">
+                        {/* Bar group */}
+                        <div className="flex gap-2 items-end" style={{ height: '240px' }}>
+                          {/* System bar */}
+                          <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
+                            {systemValue > 0 && (
                               <div
-                                className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap cursor-help"
-                                title={`Raw score: ${userValue.toFixed(1)}/20`}
+                                className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap cursor-help"
+                                title={`Raw score: ${systemValue.toFixed(1)}/20`}
                               >
-                                {Math.round((userValue / 20) * 100)}%
+                                {Math.round((systemValue / 20) * 100)}%
                               </div>
-                              <div
-                                className="w-full bg-gradient-to-t from-orange-500 to-orange-400 rounded-t transition-all duration-300"
-                                style={{ height: `${Math.max((userValue / 20) * 240, 10)}px` }}
-                                title={`User ${dim.name}: ${userValue.toFixed(1)}`}
-                              />
-                            </>
-                          ) : (
-                            <div className="w-full h-2 bg-gray-300 dark:bg-gray-600 rounded-t" title="User data pending"></div>
-                          )}
+                            )}
+                            <div
+                              className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all duration-300"
+                              style={{ height: `${Math.max((systemValue / 20) * 240, systemValue > 0 ? 10 : 0)}px` }}
+                              title={`System ${dim.name}: ${systemValue.toFixed(1)}`}
+                            />
+                          </div>
+
+                          {/* User bar */}
+                          <div className="flex flex-col justify-end items-center relative" style={{ width: '40px' }}>
+                            {userValue > 0 ? (
+                              <>
+                                <div
+                                  className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-orange-600 dark:text-orange-400 whitespace-nowrap cursor-help"
+                                  title={`Raw score: ${userValue.toFixed(1)}/20`}
+                                >
+                                  {Math.round((userValue / 20) * 100)}%
+                                </div>
+                                <div
+                                  className="w-full bg-gradient-to-t from-orange-500 to-orange-400 rounded-t transition-all duration-300"
+                                  style={{ height: `${Math.max((userValue / 20) * 240, 10)}px` }}
+                                  title={`User ${dim.name}: ${userValue.toFixed(1)}`}
+                                />
+                              </>
+                            ) : (
+                              <div className="w-full h-2 bg-gray-300 dark:bg-gray-600 rounded-t" title="User data pending"></div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* X-axis label */}
+                        <div className="mt-3 text-sm text-center font-semibold text-gray-700 dark:text-gray-300" title={`${dim.name} Demand`}>
+                          {dim.name}
                         </div>
                       </div>
+                    );
+                  })}
+                </div>
 
-                      {/* X-axis label */}
-                      <div className="mt-3 text-sm text-center font-semibold text-gray-700 dark:text-gray-300" title={`${dim.name} Demand`}>
-                        {dim.name}
-                      </div>
-                    </div>
-                  );
-                })}
+                {/* Y-axis label */}
+                <div className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
+                  Scale: 0-20
+                </div>
               </div>
 
-              {/* Y-axis label */}
-              <div className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
-                Scale: 0-20
+              {/* Right Card: Physical Demand (Before vs After) */}
+              <div className="col-span-1 p-8 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-xl relative">
+                <div className="flex items-center justify-center mb-6">
+                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white text-center">Physical Demand</h3>
+                  <button
+                    onClick={() => setPhysicalDemandInfoExpanded(!physicalDemandInfoExpanded)}
+                    className="absolute top-4 right-4 w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors flex items-center justify-center text-sm font-bold"
+                    title="Information"
+                  >
+                    ℹ️
+                  </button>
+                </div>
+
+                {/* Info Explanation */}
+                {physicalDemandInfoExpanded && (
+                  <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                    <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Before vs After Session</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                      Physical Demand is measured at two different points to track how your environment affects your performance:
+                    </p>
+                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                      <p>
+                        <span className="font-semibold text-purple-700 dark:text-purple-300">Before Session:</span> Your environment distraction rating before starting the tasks.
+                      </p>
+                      <p>
+                        <span className="font-semibold text-pink-700 dark:text-pink-300">After Session:</span> How distracting your environment felt after completing all the tasks.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Legend - Horizontal Layout */}
+                <div className="flex items-center justify-center gap-6 mb-8">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-purple-500 rounded"></div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Before</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 bg-pink-500 rounded"></div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">After</span>
+                  </div>
+                </div>
+
+                {/* Chart - Physical Demand Only */}
+                <div className="flex items-end justify-center p-6 bg-white dark:bg-gray-800 rounded-xl" style={{ height: '350px' }}>
+                  {(() => {
+                    const beforeValue = report.cognitiveLoadSummary?.sys_physical_demand || 0;
+                    const afterValue = report.nasaTlxUser?.physical_demand || 0;
+
+                    return (
+                      <div className="flex flex-col items-center">
+                        {/* Bar group */}
+                        <div className="flex gap-3 items-end" style={{ height: '240px' }}>
+                          {/* Before Session bar */}
+                          <div className="flex flex-col justify-end items-center relative" style={{ width: '50px' }}>
+                            {beforeValue > 0 && (
+                              <div
+                                className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-purple-600 dark:text-purple-400 whitespace-nowrap cursor-help"
+                                title={`Raw score: ${beforeValue.toFixed(1)}/20`}
+                              >
+                                {Math.round((beforeValue / 20) * 100)}%
+                              </div>
+                            )}
+                            <div
+                              className="w-full bg-gradient-to-t from-purple-500 to-purple-400 rounded-t transition-all duration-300"
+                              style={{ height: `${Math.max((beforeValue / 20) * 240, beforeValue > 0 ? 10 : 0)}px` }}
+                              title={`Before Session: ${beforeValue.toFixed(1)}`}
+                            />
+                          </div>
+
+                          {/* After Session bar */}
+                          <div className="flex flex-col justify-end items-center relative" style={{ width: '50px' }}>
+                            {afterValue > 0 ? (
+                              <>
+                                <div
+                                  className="absolute -top-7 left-1/2 transform -translate-x-1/2 text-sm font-bold text-pink-600 dark:text-pink-400 whitespace-nowrap cursor-help"
+                                  title={`Raw score: ${afterValue.toFixed(1)}/20`}
+                                >
+                                  {Math.round((afterValue / 20) * 100)}%
+                                </div>
+                                <div
+                                  className="w-full bg-gradient-to-t from-pink-500 to-pink-400 rounded-t transition-all duration-300"
+                                  style={{ height: `${Math.max((afterValue / 20) * 240, 10)}px` }}
+                                  title={`After Session: ${afterValue.toFixed(1)}`}
+                                />
+                              </>
+                            ) : (
+                              <div className="w-full h-2 bg-gray-300 dark:bg-gray-600 rounded-t" title="User data pending"></div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* X-axis label */}
+                        <div className="mt-3 text-sm text-center font-semibold text-gray-700 dark:text-gray-300">
+                          Physical Demand
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Y-axis label */}
+                <div className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
+                  Scale: 0-20
+                </div>
               </div>
             </div>
           </div>

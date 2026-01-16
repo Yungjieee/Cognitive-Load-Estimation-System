@@ -230,7 +230,7 @@ export function calculateFrustration(
   baselineRMSSD: number,
   questionRMSSD: number
 ): number {
-  const NEUTRAL = 10.5
+  const NEUTRAL = 10
 
   // RELAXATION SIDE (questionRMSSD >= baseline)
   if (questionRMSSD >= baselineRMSSD) {

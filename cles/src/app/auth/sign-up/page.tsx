@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { DatabaseClient } from "@/lib/database";
 
@@ -64,8 +65,14 @@ export default function SignUpPage() {
       <div className="w-full max-w-md animate-fade-in">
         <div className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md rounded-2xl shadow-2xl border border-purple-200/30 dark:border-purple-800/30 p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 rounded-2xl gradient-bg flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-xl">C</span>
+            <div className="flex items-center justify-center mx-auto mb-4">
+              <Image
+                src="/logo.png"
+                alt="CLES Logo"
+                width={64}
+                height={64}
+                className="rounded-2xl"
+              />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Join CLES</h1>
             <p className="text-gray-600 dark:text-gray-300">Start your personalized learning journey today</p>
